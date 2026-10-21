@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Gulag Padel security rules.
+// Everyone can view the seeding, live courts and history.
+// Refs (emails listed in club/access) and the league manager can run nights.
+// Only the league manager can change settings, edit or delete saved nights, and manage refs.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function isLM() {
+      return signedIn() && request.auth.token.email.lower() == 'ragy_labib@hotmail.com';
+    }
+    function isRef() {
+      return isLM() || (signedIn()
+        && exists(/databases/$(database)/documents/club/access)
+        && request.auth.token.email.lower() in get(/databases/$(database)/documents/club/access).data.refs);
+    }
+
+    // the ref list: signed-in people can read it, only the LM changes it
+    match /club/access {
+      allow read: if signedIn();
+      allow write: if isLM();
+    }
+
+    // league settings (points, seasons, ratings): public to read, LM to change
+    match /club/settings {
+      allow read: if true;
+      allow write: if isLM();
+    }
+
+    // tonight's night, the player list and the change log: public to read, refs to change
+    match /club/{docId} {
+      allow read: if docId != 'access';
+      allow write: if docId != 'access' && docId != 'settings' && isRef();
+    }
+
+    // saved nights: refs can save a finished night, only the LM can edit or delete one
+    match /nights/{nightId} {
+      allow read: if true;
+      allow create: if isRef();
+      allow update, delete: if isLM();
+    }
+  }
+}

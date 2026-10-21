@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
+<meta name="theme-color" content="#b4532a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gulag Padel">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Gulag Padel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column of court panels, court 1 at the top and the gulag at the bottom; a full-screen flip overlay for partner draws. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --fg:#17212e; --muted:#5d6b7c; --line:#d6dce5;
+  --court:#1d5fa3; --court-fg:#ffffff; --court-soft:#e3edf8;
+  --gulag:#a3401d; --gulag-soft:#f8e8e1;
+  --ball:#c8d400; --ball-fg:#17212e;
+  --win:#1f8a4c; --win-soft:#e1f3e8;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1620; --surface:#18222f; --fg:#eef2f7; --muted:#9aa8b8; --line:#2b3745;
+  --court:#2b6fb8; --court-fg:#ffffff; --court-soft:#1a2c42;
+  --gulag:#c4552c; --gulag-soft:#3a2117;
+  --ball:#d6e22a; --ball-fg:#17212e;
+  --win:#3cc277; --win-soft:#17392a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1620; --surface:#18222f; --fg:#eef2f7; --muted:#9aa8b8; --line:#2b3745;
+  --court:#2b6fb8; --court-fg:#ffffff; --court-soft:#1a2c42;
+  --gulag:#c4552c; --gulag-soft:#3a2117;
+  --ball:#d6e22a; --ball-fg:#17212e;
+  --win:#3cc277; --win-soft:#17392a; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court)}
+.wrap{max-width:720px;margin:0 auto;padding-block:12px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.topband{background:var(--court);color:var(--court-fg);border-bottom:4px solid var(--ball)}
+.topband-in{max-width:720px;margin:0 auto;padding-block:18px 16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.topband .status{color:var(--court-fg);opacity:.8}
+.topband .status.err{color:var(--court-fg);opacity:1;font-weight:600}
+.topband .venue-name{color:var(--ball)}
+.topband .cage{box-shadow:0 2px 0 rgba(0,0,0,.25)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:34px;letter-spacing:.01em;margin:0;text-transform:uppercase;text-wrap:balance}
+.logo{font-family:"Black Ops One","Barlow Condensed",Impact,sans-serif;font-weight:400;font-size:36px;letter-spacing:.04em;display:flex;align-items:center;gap:12px;line-height:1}
+.cage{position:relative;display:inline-block;padding:7px 10px 5px;background:#14100e;box-shadow:0 0 0 1px var(--line);color:var(--ball);border-radius:3px;overflow:hidden}
+.cage::after{content:"";position:absolute;inset:0;border-top:4px solid #8d8d8d;border-bottom:4px solid #8d8d8d;
+  background:repeating-linear-gradient(90deg,transparent 0 10px,rgba(150,150,150,.85) 10px 13px);pointer-events:none}
+.cage::before{content:"";position:absolute;inset:4px 0;background:repeating-linear-gradient(90deg,transparent 0 10px,rgba(0,0,0,.4) 13px 14px);pointer-events:none}
+.padel{display:inline-flex;align-items:center}
+.racket-p{height:.74em;width:auto;margin-right:.04em;transform:translateY(-.03em)}
+.racket-p .head{fill:var(--ball)}
+.racket-p .hole{fill:var(--court)}
+.racket-p .grip{fill:var(--court-fg)}
+.status{font-size:13px;color:var(--muted)}
+.status.err{color:var(--gulag)}
+nav{display:flex;gap:2px;margin:14px 0 18px;border-bottom:2px solid var(--line);overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;padding:8px 8px;font:600 13px var(--body);white-space:nowrap;flex:none;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
+nav button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--ball)}
+nav button:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+h2{font-family:var(--display);font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:.03em;margin:22px 0 10px;text-wrap:balance}
+p{margin:0 0 10px;max-width:65ch}
+.muted{color:var(--muted);font-size:14px}
+.btn{font:600 15px var(--body);padding:10px 16px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.btn.primary{background:var(--ball);color:var(--ball-fg);border-color:transparent}
+.btn.danger{color:var(--gulag);border-color:var(--gulag)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row input{flex:1;min-width:0}
+label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px}
+input{font:16px var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
+.field{margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 14px var(--body);padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chip.on{background:var(--court-soft);border-color:var(--court)}
+.count{font-family:var(--display);font-size:22px;font-weight:700}
+.count.ok{color:var(--win)}
+.count.bad{color:var(--gulag)}
+.arrivals{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.arr-row{display:grid;grid-template-columns:34px 1fr auto auto;align-items:center;gap:8px}
+.arr-row.extra{opacity:.8}
+.arr-row.gap{margin-top:8px}
+.arr-num{font-family:var(--display);font-weight:700;font-size:18px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.arr-name{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.arr-court{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--court);min-width:72px;text-align:right;font-weight:600}
+.arr-court.gul{color:var(--gulag)}
+.arr-row.extra .arr-court{color:var(--muted)}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.stepper{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.step{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.step .btn{min-width:44px;font-size:20px;line-height:1}
+.tier-lab{font-family:var(--display);font-weight:800;font-size:17px;text-transform:uppercase;letter-spacing:.06em;color:var(--court);margin-top:10px}
+.tier-lab.gul{color:var(--gulag)}
+.tier-lab.sub{color:var(--muted)}
+.arr-row{grid-template-columns:34px 1fr}
+details.pick{margin:0 0 6px}
+details.pick .chips{margin-top:8px}
+.team{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.team.won{background:var(--win-soft)}
+.tn{min-width:0;display:flex;flex-direction:column;gap:2px}
+.tn b{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;overflow-wrap:anywhere}
+.team.won .tn b::before{content:"W ";color:var(--win)}
+.tn .hint{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.team.won .hint{color:var(--win)}
+.sc{display:flex;gap:4px}
+.sv{width:40px;height:40px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:700 18px var(--display);cursor:pointer;font-variant-numeric:tabular-nums}
+.sv.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.team.won .sv.on{background:var(--win);border-color:var(--win);color:#fff}
+.court .court-foot{border-top:0}
+.opts{padding:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+.opts .lab{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.opt{text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);padding:10px 12px;font:600 15px var(--body);cursor:pointer}
+.opt:hover{border-color:var(--court)}
+.pts{font-family:var(--display);font-weight:700;font-size:18px}
+.danger-chip{border-color:var(--gulag)!important;background:var(--gulag-soft)!important;color:var(--gulag)}
+.bench .btn{margin-left:auto}
+
+/* venue themes */
+:root[data-venue="recess"]{--bg:#f7f0ea;--surface:#fffaf6;--fg:#2a1a14;--muted:#7a6358;--line:#e6d6cb;--court:#b4532a;--court-soft:#f6e1d5;--gulag:#5e2a1c;--gulag-soft:#ecdcd6;--ball:#e9b44c}
+@media (prefers-color-scheme: dark){:root[data-venue="recess"]:not([data-theme="light"]){--bg:#1c1310;--surface:#291c17;--fg:#f6ece6;--muted:#b59d92;--line:#3e2c24;--court:#c8653a;--court-soft:#3a2219;--gulag:#8a3f2a;--gulag-soft:#33201a;--ball:#efbf5a;color-scheme:dark}}
+:root[data-venue="recess"][data-theme="dark"]{--bg:#1c1310;--surface:#291c17;--fg:#f6ece6;--muted:#b59d92;--line:#3e2c24;--court:#c8653a;--court-soft:#3a2219;--gulag:#8a3f2a;--gulag-soft:#33201a;--ball:#efbf5a;color-scheme:dark}
+:root[data-venue="game4padel"]{--bg:#edf3fb;--surface:#ffffff;--fg:#0f1d33;--muted:#536581;--line:#d0dcec;--court:#1554b8;--court-soft:#dde8f8;--gulag:#0d2a5a;--gulag-soft:#dce3ef;--ball:#c8d400}
+@media (prefers-color-scheme: dark){:root[data-venue="game4padel"]:not([data-theme="light"]){--bg:#0b1424;--surface:#132036;--fg:#ecf2fb;--muted:#93a6c2;--line:#24344f;--court:#2f6fd6;--court-soft:#152a4a;--gulag:#3a5a96;--gulag-soft:#18243c;--ball:#d6e22a;color-scheme:dark}}
+:root[data-venue="game4padel"][data-theme="dark"]{--bg:#0b1424;--surface:#132036;--fg:#ecf2fb;--muted:#93a6c2;--line:#24344f;--court:#2f6fd6;--court-soft:#152a4a;--gulag:#3a5a96;--gulag-soft:#18243c;--ball:#d6e22a;color-scheme:dark}
+:root[data-venue="colosso"]{--bg:#f7f1e3;--surface:#fffcf4;--fg:#1d2a2c;--muted:#6b6a5c;--line:#e6dcc4;--court:#13879a;--court-soft:#d9eff1;--gulag:#c0573e;--gulag-soft:#f6e2da;--ball:#f2c14e}
+@media (prefers-color-scheme: dark){:root[data-venue="colosso"]:not([data-theme="light"]){--bg:#0e1a1c;--surface:#16272a;--fg:#f3eee2;--muted:#a3a594;--line:#29393b;--court:#22a3b6;--court-soft:#123438;--gulag:#d46a4f;--gulag-soft:#35221c;--ball:#f5ca5f;color-scheme:dark}}
+:root[data-venue="colosso"][data-theme="dark"]{--bg:#0e1a1c;--surface:#16272a;--fg:#f3eee2;--muted:#a3a594;--line:#29393b;--court:#22a3b6;--court-soft:#123438;--gulag:#d46a4f;--gulag-soft:#35221c;--ball:#f5ca5f;color-scheme:dark}
+.venues{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+@media (max-width:520px){.venues{grid-template-columns:1fr}}
+.venue{border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);padding:10px 12px;text-align:left;cursor:pointer;display:flex;gap:10px;align-items:center;font:inherit;min-width:0}
+.venue.on{border-color:var(--court);background:var(--court-soft)}
+.venue b{font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.03em;display:block;line-height:1.1}
+.venue small{color:var(--muted);font-size:13px}
+.swatch{width:28px;height:28px;border-radius:50%;flex:none;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+.sw-recess{background:linear-gradient(135deg,#b4532a 50%,#e9b44c 50%)}
+.sw-game4padel{background:linear-gradient(135deg,#1554b8 50%,#c8d400 50%)}
+.sw-colosso{background:linear-gradient(135deg,#13879a 50%,#f2c14e 50%)}
+.venue-name{font-size:13px;color:var(--court);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+select{font:16px var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
+select:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+.round-lab{font-family:var(--display);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+.games{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;margin-bottom:6px}
+.game{display:grid;grid-template-columns:76px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.game:last-child{border-bottom:0}
+.g-court{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--court)}
+.g-court.gul{color:var(--gulag)}
+.g-teams{min-width:0;overflow-wrap:anywhere;font-size:15px}
+.g-teams .gw{font-weight:700;color:var(--win)}
+.g-score{font-family:var(--display);font-weight:700;font-size:18px;font-variant-numeric:tabular-nums}
+.night .games{background:var(--bg)}
+.segs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:8px;scrollbar-width:none}
+.segs::-webkit-scrollbar{display:none}
+.seg{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);padding:7px 14px;cursor:pointer;font:inherit}
+.seg b{font-family:var(--display);font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.03em;line-height:1.1}
+.seg small{font-size:12px;color:var(--muted)}
+.seg.on{background:var(--court);border-color:var(--court);color:var(--court-fg)}
+.seg.on small{color:var(--court-fg);opacity:.85}
+.played{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin:4px 0 12px}
+.played-head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin-bottom:8px}
+.played-head b{font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.03em}
+.pickchip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;font-size:15px}
+.pickchip:disabled{opacity:.4;cursor:not-allowed}
+.slotno{background:var(--court);color:var(--court-fg);border-radius:999px;min-width:20px;height:20px;display:inline-grid;place-items:center;font:700 12px var(--body);padding:0 5px}
+.arr-row{grid-template-columns:34px 1fr 30px}
+.edit-bar{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
+.edit-bar .row input{max-width:220px}
+.err-text{color:var(--gulag);font-size:14px;margin:0}
+.game.edit{grid-template-columns:76px 1fr}
+.g-edit{display:flex;flex-direction:column;gap:6px;min-width:0}
+.g-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.g-row > span:first-child{min-width:0;overflow-wrap:anywhere;font-size:15px}
+.sv.sm{width:34px;height:34px;font-size:16px}
+.pname{margin-right:8px}
+.edit-n{background:none;border:0;padding:2px 4px;font:600 12px var(--body);color:var(--court);text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
+.rename{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:200px}
+.rename input{flex:1;min-width:120px;padding:6px 8px}
+.rename .err-text{flex-basis:100%}
+.liveno{margin-left:.3em;font-size:.72em;font-weight:700;font-family:var(--body);background:var(--ball);color:var(--ball-fg);border-radius:999px;padding:1px 5px;vertical-align:.15em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.seedno{margin-left:.25em;font-size:.8em;font-weight:600;opacity:.75;font-variant-numeric:tabular-nums}
+.refbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.refbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:8px;vertical-align:middle}
+@media (prefers-reduced-motion:no-preference){.refbar .dot{animation:blink 1.4s infinite}}
+@keyframes blink{50%{opacity:.25}}
+.refbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0 16px;max-width:420px}
+.refbox .row input{flex:1}
+.g-score.big{font-size:24px;min-width:28px;text-align:right}
+.newp{margin-top:10px}
+.pickchip.fresh{border-color:var(--ball);box-shadow:0 0 0 2px var(--ball)}
+.add-note{margin:8px 0 0}
+.newp input{flex:1;min-width:0}
+.sug-host{position:relative;z-index:30}
+.suggest{position:absolute;left:0;right:0;top:100%;z-index:20;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column}
+.arr-row .suggest{left:42px;right:38px}
+.suggest button{border:0;border-bottom:1px solid var(--line);background:none;color:var(--fg);text-align:left;padding:11px 12px;font:600 16px var(--body);cursor:pointer}
+.suggest button:last-child{border-bottom:0}
+.suggest button:hover,.suggest button:focus-visible{background:var(--court-soft)}
+.pbtn{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-align:inherit;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px;text-decoration-thickness:1px}
+.pbtn:hover{text-decoration-style:solid}
+.tap-hint{margin:-4px 0 12px;font-size:13px}
+.undo-row{margin:-4px 0 12px}
+.sheet-wrap{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);color:var(--fg);width:100%;max-width:560px;max-height:85vh;overflow-y:auto;border-radius:16px 16px 0 0;padding-top:16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+.sheet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.sheet-top > div{display:flex;flex-direction:column;gap:2px}
+.sheet-name{font-family:var(--display);font-size:24px;text-transform:uppercase;letter-spacing:.03em}
+.sheet-q{font-weight:600;margin:0}
+.btn.wide{width:100%;padding:14px}
+.rep-list{display:flex;flex-direction:column;gap:8px}
+.rep{text-align:left;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font:inherit}
+.rep b{font-size:16px}
+.rep span{font-size:13px;color:var(--muted);line-height:1.45}
+.rep:hover{border-color:var(--court)}
+.rep.warn{border-color:var(--gulag)}
+.nx-box{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;background:var(--surface);border:2px solid var(--ball)}
+.nx-box p{margin:0}
+.nx{display:grid;grid-template-columns:84px 1fr;gap:8px;align-items:start}
+.nx-court{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--court);padding-top:4px}
+.nx-court.gul{color:var(--gulag)}
+.nx-court.sub{color:var(--muted)}
+.nx-pl{display:flex;flex-wrap:wrap;gap:6px 12px;min-width:0}
+.nx-p{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:15px}
+.mv{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px;border-radius:999px;background:var(--line);color:var(--fg)}
+.mv-up{background:var(--win);color:#fff}
+.mv-down,.mv-off{background:var(--gulag);color:#fff}
+.mv-on{background:var(--ball);color:var(--ball-fg)}
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0 14px;display:flex;flex-direction:column;gap:10px}
+.sum-head{font-family:var(--display);font-weight:800;font-size:22px;text-transform:uppercase;letter-spacing:.03em;color:var(--court)}
+.sum-when{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.podium{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.podium li{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:8px}
+.podium .pl{font-family:var(--display);font-weight:800;font-size:22px;color:var(--court);text-align:center}
+.podium .p1 .pl{background:var(--ball);color:var(--ball-fg);border-radius:4px}
+.podium b{font-family:var(--display);font-size:20px;font-weight:700;min-width:0;overflow-wrap:anywhere}
+.facts{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.fact{display:flex;flex-direction:column;gap:1px}
+.fact span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.fact b{font-weight:600;font-size:15px}
+.copybox{width:100%;font:14px/1.5 var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical}
+.saved-night{margin-bottom:18px}
+.sum-toggle{margin:10px 0 0}
+.slam{border:2px solid var(--gulag);border-radius:10px;background:var(--surface);padding:12px;margin:-4px 0 14px;display:flex;flex-direction:column;gap:8px}
+.slam-head{display:flex;flex-direction:column;gap:2px}
+.slam-head b{font-family:var(--display);font-size:19px;text-transform:uppercase;letter-spacing:.03em;color:var(--gulag)}
+.slam-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border-radius:8px}
+.slam-row.won{background:var(--win-soft)}
+.slam-name{font-family:var(--display);font-weight:700;font-size:19px;display:inline-flex;gap:8px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.leave-undo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gulag);border-radius:8px;padding:8px 10px 8px 12px;margin:0 0 12px;font-size:15px}
+.next-block{margin:0 0 16px}
+.next-block .nx-box{margin:0}
+.round-tabs{margin-bottom:12px}
+.lm-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.lm-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lm-row:last-child{border-bottom:0}
+.lm-name{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.lm-act{display:flex;gap:6px;flex-wrap:wrap}
+.lm-sec{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin:0 0 10px}
+.lm-sec > summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lm-sec > summary::-webkit-details-marker{display:none}
+.lm-sec > summary b{font-family:var(--display);font-size:19px;text-transform:uppercase;letter-spacing:.03em}
+.lm-sec > summary::after{content:"+";font:700 20px var(--body);color:var(--muted);margin-left:auto}
+.lm-sec[open] > summary::after{content:"–"}
+.lm-sec > summary .muted{font-size:13px}
+.lm-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px}
+.lm-body .lm-list{background:var(--bg)}
+.lm-row.off .lm-name{opacity:.7}
+.tagx{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:var(--line);color:var(--fg);border-radius:999px;padding:2px 6px;vertical-align:.1em}
+.lm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.lm-grid label{display:flex;flex-direction:column;gap:4px;margin:0}
+.lm-grid.three{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.lm-note{margin:0;font-size:14px}
+.lm-night{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.lm-night .lm-row{border:0}
+.lm-night.editing{padding-bottom:8px}
+.lm-night.editing .edit-bar,.lm-night.editing .round-lab,.lm-night.editing .games{margin-left:10px;margin-right:10px}
+.mgame{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;display:flex;flex-direction:column;gap:8px}
+.mgame-top{display:flex;gap:10px;align-items:flex-end}
+.mgame-top label{display:flex;flex-direction:column;gap:4px;margin:0;flex:1}
+.mgame-top input{max-width:90px}
+.mteam{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:6px;border-radius:8px}
+.mteam.won{background:var(--win-soft)}
+.mpair{display:flex;gap:6px;flex:1 1 200px;min-width:0}
+.mpair input{min-width:0;flex:1}
+.mpair .sug-host{flex:1;min-width:0}
+.mvs{font:800 13px var(--display);color:var(--muted);text-transform:uppercase;text-align:center}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.log li{display:flex;flex-direction:column;gap:1px;padding-bottom:6px;border-bottom:1px solid var(--line);font-size:14px}
+.log li .muted{font-size:12px}
+.pos{color:var(--win);font-weight:700}
+.neg{color:var(--gulag);font-weight:700}
+.adj-note{margin-top:8px}
+td.n,th.n{white-space:nowrap}
+th.mvh,td.mvc{width:40px;text-align:center;padding-left:2px;padding-right:2px}
+.mvx{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mvx.up{color:var(--win)}
+.mvx.down{color:var(--gulag)}
+.mvx.same{color:var(--muted)}
+.mvx.new{font-size:10px;text-transform:uppercase;letter-spacing:.05em;background:var(--ball);color:var(--ball-fg);border-radius:999px;padding:1px 5px}
+.x{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 6px}
+
+.court{border-radius:10px;overflow:hidden;margin-bottom:14px;background:var(--surface);border:1px solid var(--line)}
+.court-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;background:var(--court);color:var(--court-fg)}
+.court.gulag .court-head{background:var(--gulag)}
+.court-head .name{font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.04em}
+.court-head .tag{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85;margin-left:8px}
+.state{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.18)}
+.state.playing{background:var(--ball);color:var(--ball-fg)}
+.pairs{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch}
+.pair{border:0;background:transparent;padding:14px 12px;font:inherit;color:var(--fg);cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pair .p{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;overflow-wrap:anywhere}
+.pair.won{background:var(--win-soft)}
+.pair.won .p:first-child::before{content:"W ";color:var(--win)}
+.pair .hint{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.pair.won .hint{color:var(--win)}
+.vs{align-self:center;font-family:var(--display);font-weight:800;color:var(--muted);padding:0 6px}
+.court-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--line)}
+.court-foot .muted{font-size:13px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.slot{border-radius:8px;padding:10px;background:var(--bg);min-width:0}
+.slot .lab{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:3px}
+.slot b{font-family:var(--display);font-weight:700;font-size:19px;line-height:1.15;display:block;overflow-wrap:anywhere}
+.bench{padding:10px 14px;border-radius:10px;border:1px dashed var(--line);margin-bottom:14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.bench b{font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase}
+
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.n,th.n{text-align:right}
+td.rank{font-family:var(--display);font-weight:800;font-size:20px;width:44px;color:var(--court)}
+tr.top td.rank{color:var(--ball);background:var(--fg);text-align:center;border-radius:3px}
+.tablewrap{overflow-x:auto}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.banner{background:var(--court-soft);border-left:4px solid var(--court);padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:14px}
+.banner.warn{background:var(--gulag-soft);border-left-color:var(--gulag)}
+.confirm{background:var(--gulag-soft);padding:12px;border-radius:8px;margin:10px 0}
+details{margin:10px 0}
+summary{cursor:pointer;font-weight:600}
+.night{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:4px 14px;margin-bottom:10px}
+.night summary{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0}
+.night summary b{font-family:var(--display);font-size:19px;text-transform:uppercase}
+.rules{font-size:14px;color:var(--muted);max-width:65ch}
+.rules li{margin-bottom:4px}
+@media (prefers-reduced-motion:no-preference){.pair{transition:background .15s}}
+
+.flipwrap{position:fixed;inset:0;z-index:50;background:var(--fg);color:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.flipcard{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding-block:14px 30px}
+.flip-top{width:100%;display:flex;justify-content:space-between;align-items:center}
+.flip-eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--ball);font-weight:600}
+.flipwrap .btn{background:transparent;color:var(--bg);border-color:var(--muted)}
+.flipwrap .btn.primary{background:var(--ball);color:var(--ball-fg);border-color:transparent}
+.flip-courtname{font-family:var(--display);font-weight:800;font-size:44px;line-height:1;text-transform:uppercase;letter-spacing:.02em}
+.flip-courtname small{display:block;font-size:16px;letter-spacing:.14em;color:var(--ball);margin-top:4px}
+.flip-sides,.flip-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
+.side{background:color-mix(in srgb,var(--bg) 8%,transparent);border-radius:10px;padding:10px;min-width:0}
+.side-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.12em;opacity:.7;margin-bottom:4px}
+.side b{font-family:var(--display);font-size:20px;font-weight:700;line-height:1.15;display:block;overflow-wrap:anywhere}
+.flip-options{font-size:13px;opacity:.75}
+.flip-options div{min-width:0}
+.flip-options span{display:block;text-transform:uppercase;letter-spacing:.1em;font-size:11px;color:var(--ball);margin-bottom:2px}
+.racket-stage{background:none;border:0;color:inherit;cursor:pointer;padding:20px 0 0;perspective:900px;display:flex;flex-direction:column;align-items:center;gap:10px;font:inherit}
+.toss{width:120px;height:220px}
+.racket{width:100%;height:100%;position:relative;transform-style:preserve-3d}
+.racket.spinning{transition:transform 1.7s cubic-bezier(.12,.8,.25,1)}
+.face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face.front path{fill:var(--ball)}
+.face.front .holes circle{fill:var(--ball-fg);opacity:.55}
+.face.front .logo{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.08em;fill:var(--ball-fg)}
+.face.back{transform:rotateY(180deg)}
+.face.back path{fill:var(--court)}
+.face.back .holes circle{fill:var(--bg);opacity:.5}
+.racket-hint{font-size:12px;text-transform:uppercase;letter-spacing:.14em;opacity:.75}
+.racket-stage:disabled{cursor:default}
+@keyframes toss{0%{transform:translateY(0)}45%{transform:translateY(-90px)}100%{transform:translateY(0)}}
+.toss.tossing{animation:toss 1.7s cubic-bezier(.3,.6,.4,1)}
+.flip-result{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px}
+.landed{font-family:var(--display);font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ball)}
+.flip-pairs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;width:100%;align-items:center}
+.fp{background:var(--ball);color:var(--ball-fg);border-radius:10px;padding:12px;font-family:var(--display);font-weight:800;font-size:22px;line-height:1.1;min-width:0;overflow-wrap:anywhere}
+.flip-pairs .vs{color:var(--bg)}
+@media (prefers-reduced-motion:no-preference){.fp{animation:pop .4s cubic-bezier(.2,1.4,.4,1) both}.fp:nth-child(3){animation-delay:.1s}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.racket.spinning{transition-duration:.3s}.toss.tossing{animation:none}}
+
+/* default look before a venue is picked: dark terracotta */
+:root:not([data-venue]){--bg:#2a1712;--surface:#3a2119;--fg:#f7ebe3;--muted:#c4a294;--line:#57372b;--court:#c4612f;--court-fg:#ffffff;--court-soft:#4b2a1e;--gulag:#8a3a24;--gulag-soft:#3e2219;--ball:#e9b44c;--ball-fg:#2a1712;--win:#5fcf8c;--win-soft:#22382a;color-scheme:dark}
+</style>
+
+<style>
+.hdr-side{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.acct{background:rgba(0,0,0,.18);color:var(--court-fg);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;font:600 12px var(--body);text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
+.acct:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+.refbox input{width:100%}
+.refbox label{margin-top:2px}
+.auth-links{margin-top:6px}
+</style>
+</head>
+<body>
+<div class="topband"><div class="topband-in">
+<header>
+    <h1 class="logo" aria-label="Gulag Padel"><span class="cage" aria-hidden="true">GULAG</span><span class="padel" aria-hidden="true"><svg class="racket-p" viewBox="0 0 40 56"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></h1>
+    <div class="hdr-side"><div class="venue-name" id="venue-name"></div><div class="status" id="status">Loading</div><button class="acct" id="acct" type="button">Sign in</button></div>
+  </header>
+</div></div>
+<div class="wrap">
+  <nav role="tablist">
+    <button role="tab" data-tab="seed" aria-selected="true">Seeding</button>
+    <button role="tab" data-tab="night" aria-selected="false">Tonight</button>
+    <button role="tab" data-tab="history" aria-selected="false">History</button>
+    <button role="tab" data-tab="lm" aria-selected="false">LM Tools</button>
+  </nav>
+  <main id="main"></main>
+  <details>
+    <summary>House rules</summary>
+    <ul class="rules">
+      <li>Courts fill in arrival order: first four on Tier 1, last four in the gulag. Up to 4 subs wait on the gulag.</li>
+      <li>Starting matchups are random.</li>
+      <li>Win and you level up a tier. Lose and you drop a tier.</li>
+      <li>Win on Tier 1 and you stay on the court.</li>
+      <li>Lose in the gulag and you’re subbed off with your teammate.</li>
+      <li>With 3 subs, the pair who just lost in the gulag play a best-of-3 point slam while they sit out. The winner takes the second sub spot next round.</li>
+      <li>After every game you face your old teammate: whether you went up, came down, stayed on Tier 1 or subbed back on. Flip the racket or pick the teams yourself; either way you partner someone from the other pair.</li>
+      <li>Games are first to 3. Scores feed tonight’s ranking and the overall seedings.</li>
+    </ul>
+  </details>
+</div>
+
+<div class="flipwrap" id="flip" hidden>
+  <div class="flipcard">
+    <div class="flip-top"><span class="flip-eyebrow" id="flip-eyebrow"></span><button class="btn sm" id="flip-skip">Skip the show</button></div>
+    <div class="flip-courtname" id="flip-court"></div>
+    <div class="flip-sides">
+      <div class="side"><span class="side-label" id="side-a-label"></span><b id="side-a"></b></div>
+      <div class="side"><span class="side-label" id="side-b-label"></span><b id="side-b"></b></div>
+    </div>
+    <div class="flip-options" id="flip-options"></div>
+    <button class="racket-stage" id="racket-btn" aria-label="Flip the racket">
+      <div class="toss" id="toss"><div class="racket" id="racket">
+        <svg class="face front" viewBox="0 0 120 220" aria-hidden="true"><path d="M60 6c30 0 52 24 52 58 0 30-18 52-36 66-5 4-7 8-7 14v50a9 9 0 0 1-18 0v-50c0-6-2-10-7-14C26 116 8 94 8 64 8 30 30 6 60 6z"/><g class="holes"><circle cx="40" cy="40" r="4"/><circle cx="60" cy="36" r="4"/><circle cx="80" cy="40" r="4"/><circle cx="32" cy="60" r="4"/><circle cx="88" cy="60" r="4"/><circle cx="40" cy="80" r="4"/><circle cx="80" cy="80" r="4"/><circle cx="60" cy="100" r="4"/><circle cx="46" cy="60" r="4"/><circle cx="74" cy="60" r="4"/><circle cx="60" cy="78" r="4"/></g><text x="60" y="130" text-anchor="middle" class="logo">GULAG</text></svg>
+        <svg class="face back" viewBox="0 0 120 220" aria-hidden="true"><path d="M60 6c30 0 52 24 52 58 0 30-18 52-36 66-5 4-7 8-7 14v50a9 9 0 0 1-18 0v-50c0-6-2-10-7-14C26 116 8 94 8 64 8 30 30 6 60 6z"/><g class="holes"><circle cx="40" cy="40" r="4"/><circle cx="60" cy="36" r="4"/><circle cx="80" cy="40" r="4"/><circle cx="32" cy="60" r="4"/><circle cx="88" cy="60" r="4"/><circle cx="40" cy="80" r="4"/><circle cx="80" cy="80" r="4"/><circle cx="60" cy="100" r="4"/><circle cx="46" cy="60" r="4"/><circle cx="74" cy="60" r="4"/><circle cx="60" cy="78" r="4"/></g></svg>
+      </div></div>
+      <span class="racket-hint" id="racket-hint">Tap to flip</span>
+    </button>
+    <div class="flip-result" id="flip-result" hidden>
+      <div class="landed" id="landed"></div>
+      <div class="flip-pairs"><div class="fp" id="fp0"></div><span class="vs">vs</span><div class="fp" id="fp1"></div></div>
+      <button class="btn primary" id="flip-next">Next court</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS = 'gulag-padel-v1';
+const MAXC = 8, MAXS = 4, DAY = 864e5;
+const VENUES = {recess:{name:'Recess Padel Club', note:'Terracotta'}, game4padel:{name:'Game4Padel Port Melbourne', note:'Blue'}, colosso:{name:'Colosso Brighton', note:'Beach'}};
+const blankNight = (k=3, s=0) => ({phase:'setup', setup:{courts:k, subs:s, names:[]}, arrivals:[], left:[], round:0, courts:[], bench:[], log:[], startedAt:null});
+
+let tab = 'seed', roster = [], night = blankNight(), nights = [], db = null, confirming = null;
+
+/* ---------- storage ---------- */
+function setStatus(t, err){ const s=$('#status'); s.textContent=t; s.className='status'+(err?' err':''); }
+function fix(n){ n=n||blankNight(); if(!n.setup) n.setup={courts:3,subs:0,names:[]}; if(!n.left) n.left=[]; return n; }
+let settings={}, changelog=[];
+const DEFAULTS={win:10, tier:2, upset:10, carry:5, fullWeeks:10, halfWeeks:20, seedBadges:6, liveBadges:4};
+const S = k => settings.rules && settings.rules[k]!=null ? settings.rules[k] : DEFAULTS[k];
+const isInactive = p => (settings.inactive||[]).includes(p);
+function currentSeason(){ const c=(settings.seasons&&settings.seasons.current)||{}; return {name:c.name||'Season 1', start:c.start||null, end:null}; }
+function pastSeasons(){ return (settings.seasons&&settings.seasons.past)||[]; }
+function lsLoad(){ try{ const d=JSON.parse(localStorage.getItem(LS)||'{}'); roster=d.roster||[]; night=fix(d.night); nights=d.nights||[]; settings=d.settings||{}; changelog=d.changelog||[]; }catch(e){} }
+function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({roster,night,nights,settings,changelog})); }catch(e){} }
+const saveSettings = () => write('club/settings', JSON.parse(JSON.stringify(settings)));
+function logChange(what){ changelog=[{at:new Date().toISOString(), what}, ...changelog].slice(0,300); write('club/changelog', {entries:changelog}); }
+// Saves: always send the newest version of each document; a save that hangs times out so later saves still go through.
+const pending = {}, inflight = {}, lastLocal = {};
+const busyPath = p => !!(inflight[p] || pending[p] || Date.now()-(lastLocal[p]||0) < 4000);
+function write(path, body){
+  lastLocal[path]=Date.now(); lsSave();
+  if(!db) return;
+  pending[path]=body; if(!inflight[path]) flush(path);
+}
+async function flush(path){
+  inflight[path]=true;
+  while(pending[path]){
+    const body=pending[path]; pending[path]=null;
+    let tries=0;
+    for(;;){
+      try{ await Promise.race([db.doc(path).set(body), new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),8000))]); setStatus('Saved'); break; }
+      catch(e){
+        if(e && (e.code==='invalid_argument'||e.code==='permission-denied')){ setStatus('Not saved: your account can’t change this. Sign in as a ref or the league manager', true); break; }
+        if(e && e.code==='timeout'){ setStatus('Saved on this phone. It will sync when the signal comes back'); break; }
+        if(++tries>=3 || pending[path]){ setStatus('Couldn’t save. Check your connection', true); break; }
+        await new Promise(r=>setTimeout(r, 600*tries));
+      }
+    }
+  }
+  inflight[path]=false; lastLocal[path]=Date.now();
+}
+const saveNight = () => write('club/tonight', JSON.parse(JSON.stringify(night)));
+const saveRoster = () => write('club/roster', {players:roster});
+
+/* ---------- ratings and points ----------
+   Per game, each player earns: games won (0-3), plus on a win 10 points,
+   a tier bonus (2 per tier above the gulag) and an upset bonus of up to 10
+   for beating a team the ratings expected to win. Ratings are Elo-style,
+   moved more by bigger score margins. */
+const avg = (r,t) => (rate(r,t[0])+rate(r,t[1]))/2;
+const rate = (r,p) => r[p] ?? ((settings.ratings||{})[p] ?? 1000);
+function playGames(games, elo, stats){
+  const st = stats || {};
+  const get = p => st[p] = st[p] || {name:p, pts:0, w:0, g:0, gw:0, gl:0, top:0};
+  games.slice().sort((x,y)=> x.round-y.round || x.court-y.court).forEach(g=>{
+    if(g.winner==null || !g.pairs) return;
+    const sc = g.score && g.score[0]!=null && g.score[1]!=null ? g.score : (g.winner===0?[3,1]:[1,3]);
+    const R=[avg(elo,g.pairs[0]), avg(elo,g.pairs[1])];
+    const E0 = 1/(1+Math.pow(10,(R[1]-R[0])/400)), E=[E0,1-E0];
+    const mult = 1 + 0.25*(Math.max(1,Math.abs(sc[0]-sc[1]))-1);
+    const delta = [0,1].map(t=> 24*mult*((t===g.winner?1:0)-E[t]));
+    [0,1].forEach(t=> g.pairs[t].forEach(p=>{
+      const s=get(p), win=t===g.winner;
+      s.g++; s.gw+=sc[t]; s.gl+=sc[1-t]; if(g.court===0) s.top++;
+      s.pts += sc[t];
+      if(win){ s.w++; s.pts += S('win') + S('tier')*Math.max(0,(g.courts||1)-1-g.court) + Math.round(S('upset')*(1-E[t]));
+        // carry bonus: winning with a partner rated well below you (full bonus at a 250+ rating gap, nothing under 50)
+        const mate=g.pairs[t].find(x=>x!==p), gap=rate(elo,p)-rate(elo,mate), cb=Math.round(S('carry')*Math.min(1,Math.max(0,(gap-50)/200)));
+        if(cb>0){ s.pts+=cb; s.carry=(s.carry||0)+cb; } }
+    }));
+    [0,1].forEach(t=> g.pairs[t].forEach(p=> elo[p]=rate(elo,p)+delta[t]));
+  });
+  return st;
+}
+const rank = st => Object.values(st).sort((x,y)=> y.pts-x.pts || y.w-x.w || (y.gw-y.gl)-(x.gw-x.gl) || x.name.localeCompare(y.name));
+function history(){ // chronological replay of every saved night
+  const elo={}; const out=nights.slice().sort((a,b)=> a.date<b.date?-1:1).map(nt=>{ const before={...elo}; return {nt, before, st:playGames(nt.games||[], elo)}; });
+  return {elo, nights:out};
+}
+// Seeding: points from the last 10 weeks count in full, weeks 11-20 count half. Turning up and winning steadily beats one big night.
+function seeding(season, before){
+  season = season || currentSeason();
+  // before: an ISO date; gives the seeding as it stood just before that moment (used for week-on-week movement)
+  const h=history(), now=before?new Date(before).getTime():season.end?new Date(season.end).getTime():Date.now(), s={};
+  const inSeason = nt => (!season.start || nt.date>=season.start) && (!season.end || nt.date<season.end) && (!before || nt.date<before);
+  if(!season.end) roster.forEach(p=> s[p]={name:p, seed:0, n:0, w:0, g:0});
+  h.nights.forEach(({nt,st})=>{
+    if(!inSeason(nt)) return;
+    const age=(now-new Date(nt.date))/DAY, wt = age<=S('fullWeeks')*7?1:age<=S('halfWeeks')*7?.5:0;
+    Object.values(st).forEach(r=>{ const x=s[r.name]=s[r.name]||{name:r.name,seed:0,n:0,w:0,g:0};
+      x.w+=r.w; x.g+=r.g; if(wt){ x.seed+=r.pts*wt; x.n++; } });
+  });
+  // manual point adjustments from LM Tools count in full in the season they were made
+  (settings.adjust||[]).forEach(a=>{ if((season.start && a.at<season.start) || (season.end && a.at>=season.end) || (before && a.at>=before)) return;
+    const x=s[a.name]=s[a.name]||{name:a.name,seed:0,n:0,w:0,g:0}; x.seed+=a.pts; x.adj=(x.adj||0)+a.pts; });
+  return Object.values(s).map(x=>({...x, seed:Math.round(x.seed), rating:Math.round(rate(h.elo,x.name))}))
+    .sort((a,b)=> b.seed-a.seed || b.rating-a.rating || a.name.localeCompare(b.name));
+}
+function tonightGames(){ return [...night.log, ...night.courts.map((c,i)=>({round:night.round, court:i, courts:night.courts.length, pairs:c.pairs, score:c.score, winner:c.winner})).filter(g=>g.winner!=null)]; }
+function tonight(){ const elo={...history().elo}; return rank(playGames(tonightGames(), elo)); }
+
+/* ---------- court logic ---------- */
+function courtName(i, total){ return total>1 && i===total-1 ? 'The Gulag' : 'Tier '+(i+1); }
+function courtTag(i, total){ if(total===1) return ''; if(i===0) return 'Top court'; if(i===total-1) return 'Bottom court'; return ''; }
+function optionPairs(c, face){ const [a0,a1]=c.a, [b0,b1]=c.b; return face==='up' ? [[a0,b0],[a1,b1]] : [[a0,b1],[a1,b0]]; }
+function allOptions(c){ const o=[optionPairs(c,'up'), optionPairs(c,'down')]; if(c.free) o.unshift([[...c.a],[...c.b]]); return o; }
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const setupNames = () => { const s=night.setup; return Array.from({length:s.courts*4+s.subs}, (_,i)=> (s.names[i]||'').trim()); };
+const freshCourt = (p, lab='Drawn') => ({a:[p[0],p[1]], b:[p[2],p[3]], aLab:lab, bLab:lab, free:true, pairs:null, face:null, score:null, winner:null});
+
+function startNight(){
+  const s=night.setup, names=setupNames(), k=s.courts;
+  if(names.slice(0,k*4).some(n=>!n) || !s.venue) return;
+  night.venue = s.venue;
+  names.filter(Boolean).forEach(p=>{ if(!roster.includes(p)) roster.push(p); }); saveRoster();
+  night.arrivals = names.filter(Boolean); night.left=[];
+  night.courts = [];
+  for(let i=0;i<k;i++) night.courts.push(freshCourt(shuffle(names.slice(i*4,i*4+4)))); // rule 1
+  night.bench = names.slice(k*4).filter(Boolean);
+  night.phase='live'; night.round=1; night.startedAt=new Date().toISOString(); night.log=[];
+  saveNight(); render();
+}
+function nextRound(){
+  const snap = JSON.stringify({...night, undo:[]});
+  night.undo = [...(night.undo||[]), snap].slice(-3); // keep the last 3 rounds to step back through
+  advance(night); confirming=null; viewRound=null; rDraft=null;
+  saveNight(); render(); window.scrollTo(0,0);
+}
+function undoRound(){
+  const u=(night.undo||[]).slice(); const last=u.pop(); if(!last) return;
+  const prev=JSON.parse(last); prev.undo=u; night=fix(prev); confirming=null;
+  saveNight(); render(); window.scrollTo(0,0);
+}
+function advance(night){
+  const C = night.courts, n=C.length;
+  C.forEach((c,i)=> night.log.push({round:night.round, court:i, courts:n, pairs:c.pairs, score:c.score, winner:c.winner}));
+  const W = C.map(c=>c.pairs[c.winner]), L = C.map(c=>c.pairs[1-c.winner]);
+  const next = [];
+  for(let i=0;i<n;i++){
+    let a,b,aLab,bLab; // each group were teammates last game; the draw always splits them
+    if(n===1){ a=W[0]; b=L[0]; aLab='Won'; bLab='Lost'; }
+    else if(i===0){ a=W[0]; b=W[1]; aLab='Won Tier 1, stayed'; bLab='Won, came up'; }
+    else if(i===n-1){ a=L[i-1]; b=L[i]; aLab='Lost, came down'; bLab='Lost in the gulag'; }
+    else { a=L[i-1]; b=W[i+1]; aLab='Lost, came down'; bLab='Won, came up'; }
+    next.push({a:[...a], b:[...b], aLab, bLab, free:false, pairs:null, face:null, score:null, winner:null});
+  }
+  const g = next[n-1], swaps = Math.min(night.bench.length, 2), sl = slamState(night); // rule 7
+  if(swaps){
+    let inc;
+    if(swaps===2 && sl && sl.winner!=null){ inc=[night.bench[0], sl.pair[sl.winner]]; night.bench=night.bench.filter(p=>!inc.includes(p)); } // slam loser keeps their place at the front
+    else inc=night.bench.splice(0, swaps);
+    const out = g.b.splice(0, swaps, ...inc); night.bench.push(...out);
+    if(out.length===2) night.offPairs=[...(night.offPairs||[]), out].slice(-6);
+    g.bLab = swaps===2 ? 'Subbed on' : 'Sub + gulag loser';
+  }
+  night.slam=null; night.leaveUndo=[];
+  night.courts = next; night.round++;
+}
+// Point slam: when the second sub spot would go to one of the pair who just lost in the gulag, they play each other for it (best of 3 points).
+function slamPair(N){ const b=N.bench; if(b.length<3 || !N.courts.length) return null; const x=b[1], y=b[2];
+  return (N.offPairs||[]).some(q=>(q[0]===x&&q[1]===y)||(q[0]===y&&q[1]===x)) ? [x,y] : null; }
+function slamState(N){ const pr=slamPair(N); if(!pr) return null;
+  if(!N.slam || N.slam.pair.join('|')!==pr.join('|')) N.slam={pair:pr, score:[null,null]};
+  const sc=N.slam.score, w = sc[0]===2&&sc[1]!==2 ? 0 : sc[1]===2&&sc[0]!==2 ? 1 : null;
+  return {pair:pr, score:sc, winner:w, first:N.bench[0]}; }
+const locMap = N => { const m={}; N.courts.forEach((c,i)=>[...c.a,...c.b].forEach(p=>{ if(p) m[p]=i; })); N.bench.forEach(p=> m[p]='sub'); return m; };
+const moveOf = (b,a) => a===undefined ? 'left' : b==='sub' && a==='sub' ? 'wait' : b==='sub' ? 'on' : a==='sub' ? 'off' : a<b ? 'up' : a>b ? 'down' : 'stay';
+const MOVE_LABEL = {up:'Up', down:'Down', stay:'Stays', on:'On', off:'Off', wait:'Waits', left:'Left'};
+function nextPreview(){
+  const N=JSON.parse(JSON.stringify(night)), before=locMap(night); advance(N); const after=locMap(N);
+  return {courts:N.courts.map((c,i)=>({name:courtName(i,N.courts.length), gul:N.courts.length>1&&i===N.courts.length-1, players:[...c.a,...c.b].map(p=>({p, mv:moveOf(before[p],after[p])}))})),
+          bench:N.bench.map(p=>({p, mv:moveOf(before[p],after[p])}))};
+}
+function resetCourt(c, N){ c.pairs=null; c.face=null; c.score=null; c.winner=null; c.free = N.round===1 && !N.log.length; }
+// Apply a leaver plus the ref's choice of replacement to night N (also used on a copy to preview the result).
+function applyLeave(N, p, choice){
+  N.left.push(p);
+  const bi=N.bench.indexOf(p); if(bi>=0){ N.bench.splice(bi,1); return; }
+  const ci=N.courts.findIndex(c=>[...c.a,...c.b].includes(p)); if(ci<0) return;
+  const key=N.courts[ci].a.includes(p)?'a':'b', gi=N.courts[ci][key].indexOf(p);
+  const autoFill=(ci,key,gi)=>{ // fill a hole: first sub waiting, else pull up the same spot from the court below, else the court sits out
+    const c=N.courts[ci];
+    if(N.bench.length){ c[key][gi]=N.bench.shift(); resetCourt(c,N); return; }
+    if(ci<N.courts.length-1){ const below=N.courts[ci+1]; c[key][gi]=below[key][gi]; resetCourt(c,N); autoFill(ci+1,key,gi); return; }
+    c[key][gi]=null; const rest=[...c.a,...c.b].filter(Boolean); N.courts.splice(ci,1); N.bench.push(...rest);
+  };
+  const c=N.courts[ci];
+  if(choice && choice.type==='sub'){ c[key][gi]=choice.name; N.bench.splice(N.bench.indexOf(choice.name),1); resetCourt(c,N); }
+  else if(choice && choice.type==='up'){ const below=N.courts[ci+1], k2=below.a.includes(choice.name)?'a':'b', g2=below[k2].indexOf(choice.name);
+    c[key][gi]=choice.name; resetCourt(c,N); autoFill(ci+1,k2,g2); }
+  else autoFill(ci,key,gi);
+}
+// Undo for "left early": keep the night as it was just before, so a player who comes back gets their exact spot back.
+const stateKey = N => JSON.stringify([N.round, N.courts, N.bench, N.left, N.log.length, N.slam&&N.slam.score&&N.slam.score.some(v=>v!=null)?N.slam.score:null]);
+function leaveWithUndo(p, choice){
+  const before=JSON.stringify({...night, leaveUndo:[]});
+  applyLeave(night, p, choice);
+  night.leaveUndo=[...(night.leaveUndo||[]), {p, before, after:stateKey(night)}].slice(-3);
+  sheet=null; saveNight(); render();
+}
+function undoLeave(){
+  const u=(night.leaveUndo||[]).slice(); const last=u.pop(); if(!last) return;
+  const prev=JSON.parse(last.before); prev.leaveUndo=u; prev.undo=night.undo; night=fix(prev); confirming=null;
+  saveNight(); render(); setStatus(`${last.p} is back in their spot`);
+}
+function leaveOptions(p){
+  const ci=night.courts.findIndex(c=>[...c.a,...c.b].includes(p)); if(ci<0) return [];
+  const opts=[...night.bench.map(n=>({type:'sub', name:n}))];
+  const below=night.courts[ci+1]; if(below) [...below.a,...below.b].forEach(n=>opts.push({type:'up', name:n}));
+  if(!opts.length) opts.push({type:'auto'});
+  return opts.map(o=>{
+    const N=JSON.parse(JSON.stringify(night)), before=locMap(night); applyLeave(N,p,o); const after=locMap(N), n0=night.courts.length, n1=N.courts.length;
+    const where=x=> x==='sub'?'subs':x===undefined?'gone':courtName(x, x<n1?n1:n0);
+    const moves=Object.keys(before).filter(x=>x!==p && before[x]!==after[x]).map(x=>`${x}: ${before[x]==='sub'?'subs':courtName(before[x],n0)} → ${where(after[x])}`);
+    const restarts=night.courts.filter((c,i)=>c.score&&(c.score[0]!=null||c.score[1]!=null)&&N.courts[i]&&!N.courts[i].pairs).length;
+    const title = o.type==='sub' ? `${o.name} (sub)` : o.type==='up' ? `${o.name} moves up from ${courtName(ci+1,n0)}` : (n1<n0 ? `${courtName(ci,n0)} sits out` : 'Fill automatically');
+    return {...o, title, moves, restarts, breaks:n1<n0};
+  });
+}
+function addCourtFromSubs(){ night.courts.push(freshCourt(night.bench.splice(0,4),'Off the subs bench')); saveNight(); render(); }
+function setScore(c, t, v){
+  c.score = c.score || [null,null];
+  c.score[t] = c.score[t]===v ? null : v;
+  if(v===3 && c.score[1-t]===3) c.score[1-t]=null;
+  const [x,y]=c.score;
+  c.winner = x!=null && y!=null && (x===3)!==(y===3) ? (x===3?0:1) : null;
+}
+async function endNight(){
+  const rec = {venue:night.venue||null, date:night.startedAt||new Date().toISOString(), players:night.arrivals, left:night.left, games:tonightGames(), rounds:night.round};
+  if(rec.games.length){
+    if(db){ try{ await db.collection('nights').add(rec); }catch(e){ setStatus('Couldn’t save the night. Try again', true); return; } }
+    if(!nights.some(n=>n.date===rec.date)) nights.unshift(rec);
+    justEnded=rec.date; if(!db) lsSave();
+  }
+  { const v=night.setup.venue; night = blankNight(night.setup.courts, night.setup.subs); night.setup.venue=v; } confirming=null; saveNight(); render(); window.scrollTo(0,0);
+}
+
+/* ---------- night summary ---------- */
+let justEnded=null, sumOpen=null, copied=null, copyFallback=null;
+function summaryData(date){
+  const h=history().nights.find(x=>x.nt.date===date); if(!h) return null;
+  const {nt, before, st}=h, r=rank(st), elo={...before};
+  let upset=null; const per={}, streak={};
+  (nt.games||[]).filter(g=>g.pairs&&g.winner!=null).slice().sort((x,y)=>x.round-y.round||x.court-y.court).forEach(g=>{
+    const R=[avg(elo,g.pairs[0]),avg(elo,g.pairs[1])], E0=1/(1+Math.pow(10,(R[1]-R[0])/400)), Ew=g.winner===0?E0:1-E0;
+    if(Ew<0.5 && (!upset||Ew<upset.e)) upset={e:Ew, g};
+    playGames([g], elo);
+    g.pairs.forEach((pr,t)=>pr.forEach(p=>{ const k=streak[p]=streak[p]||{cur:0,best:0}; k.cur = t===g.winner ? k.cur+1 : 0; if(k.cur>k.best) k.best=k.cur; }));
+    const n=g.courts||1; g.pairs.flat().forEach(p=>{ const x=per[p]=per[p]||{first:null,last:null,n,gul:0}; if(x.first===null){ x.first=g.court; x.fn=n; } x.last=g.court; x.ln=n; if(n>1&&g.court===n-1) x.gul++; });
+  });
+  let climber=null; Object.entries(per).forEach(([p,x])=>{ const c=x.first-x.last; if(c>0 && (!climber||c>climber.c)) climber={p,c,from:courtName(x.first,x.fn),to:courtName(x.last,x.ln)}; });
+  const unbeaten=r.filter(x=>x.g>0&&x.w===x.g).map(x=>x.name);
+  const bestRun=Math.max(0,...Object.values(streak).map(k=>k.best)), runners=bestRun>=2?Object.keys(streak).filter(p=>streak[p].best===bestRun):[];
+  const winStreak = runners.length ? {n:bestRun, who:runners} : null;
+  let gulag=null; Object.entries(per).forEach(([p,x])=>{ if(x.gul>0&&(!gulag||x.gul>gulag.n)) gulag={p,n:x.gul}; });
+  const d=new Date(nt.date), when=d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+  return {nt, when, venue:nt.venue&&VENUES[nt.venue]?VENUES[nt.venue].name:'', top:r.slice(0,3), upset, climber, winStreak, unbeaten, gulag};
+}
+const tm = pr => pr.join(' & ');
+const upsetLine = u => `${tm(u.g.pairs[u.g.winner])} beat ${tm(u.g.pairs[1-u.g.winner])}${u.g.score&&u.g.score[0]!=null&&u.g.score[1]!=null?` ${u.g.score[u.g.winner]}–${u.g.score[1-u.g.winner]}`:''} on ${courtName(u.g.court,u.g.courts||1)}`;
+function summaryText(date){
+  const S=summaryData(date); if(!S) return '';
+  const L=[`GULAG PADEL · ${S.when}${S.venue?' · '+S.venue:''}`, '', 'Top of the night'];
+  S.top.forEach((r,i)=>L.push(`${i+1}. ${r.name}: ${r.pts} pts (${r.w}–${r.g-r.w})`));
+  if(S.upset) L.push('', `Biggest upset: ${upsetLine(S.upset)}`);
+  if(S.climber) L.push(`Biggest climber: ${S.climber.p}, ${S.climber.from} → ${S.climber.to}`);
+  if(S.winStreak) L.push(`Longest win streak: ${S.winStreak.who.join(', ')} (${S.winStreak.n} in a row)`);
+  if(S.unbeaten.length) L.push(`Unbeaten: ${S.unbeaten.join(', ')}`);
+  if(S.gulag) L.push(`Most time in the gulag: ${S.gulag.p} (${S.gulag.n} game${S.gulag.n>1?'s':''})`);
+  return L.join('\n');
+}
+function summaryCard(date, heading){
+  const S=summaryData(date);
+  if(!S) return `<div class="summary"><p class="muted">Saving the night…</p></div>`;
+  const fact=(k,v)=>`<div class="fact"><span>${k}</span><b>${v}</b></div>`;
+  return `<div class="summary">${heading?`<div class="sum-head">${heading}</div>`:''}<div class="sum-when">${esc(S.when)}${S.venue?' · '+esc(S.venue):''}</div>
+  <ol class="podium">${S.top.map((r,i)=>`<li class="p${i+1}"><span class="pl">${i+1}</span><b>${esc(r.name)}</b><span class="muted">${r.pts} pts · ${r.w}–${r.g-r.w}</span></li>`).join('')}</ol>
+  <div class="facts">${S.upset?fact('Biggest upset',esc(upsetLine(S.upset))):''}${S.climber?fact('Biggest climber',`${esc(S.climber.p)}, ${esc(S.climber.from)} → ${esc(S.climber.to)}`):''}${S.winStreak?fact('Longest win streak',`${esc(S.winStreak.who.join(', '))} (${S.winStreak.n} in a row)`):''}${S.unbeaten.length?fact('Unbeaten',esc(S.unbeaten.join(', '))):''}${S.gulag?fact('Most time in the gulag',`${esc(S.gulag.p)} (${S.gulag.n} game${S.gulag.n>1?'s':''})`):''}</div>
+  ${copyFallback===date?`<p class="muted">Press and hold the text below to copy it.</p><textarea class="copybox" id="copybox" readonly rows="10">${esc(summaryText(date))}</textarea>`:''}</div>`;
+}
+
+/* ---------- player sheet: tap a name ---------- */
+let sheet=null, sheetOpts=[];
+const pb = (p, ro) => ro ? nm(p) : `<button class="pbtn" data-player="${esc(p)}">${nm(p)}</button>`;
+function sheetView(){
+  const p=sheet.p, n=night.courts.length, ci=night.courts.findIndex(c=>[...c.a,...c.b].includes(p)), onBench=night.bench.includes(p);
+  if(ci<0 && !onBench){ sheet=null; return ''; }
+  const where = onBench ? 'Waiting as a gulag sub' : `On ${courtName(ci,n)}`;
+  let body;
+  if(sheet.step==='menu') body = `<button class="btn danger wide" id="sheet-left">${esc(p)} left early</button>`;
+  else if(onBench) body = `<p>Take ${esc(p)} off the subs list? They keep the points they’ve earned.</p><button class="btn danger wide" id="sheet-bench-yes">Yes, ${esc(p)} has left</button>`;
+  else {
+    sheetOpts=leaveOptions(p);
+    body = `<p class="sheet-q">Who takes ${esc(p)}’s spot on ${courtName(ci,n)}?</p><div class="rep-list">${sheetOpts.map((o,i)=>`<button class="rep${o.breaks?' warn':''}" data-rep="${i}"><b>${esc(o.title)}</b>${o.moves.length?`<span>${o.moves.map(esc).join('<br>')}</span>`:''}${o.breaks?'<span>Not enough players for this court, so the rest sit out as subs.</span>':''}${o.restarts?`<span>${o.restarts} game${o.restarts>1?'s':''} in progress will restart with new partners.</span>`:''}</button>`).join('')}</div><p class="muted">${esc(p)} keeps the points they’ve earned tonight.</p>`;
+  }
+  return `<div class="sheet-wrap" id="sheet-wrap"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(p)}"><div class="sheet-top"><div><b class="sheet-name">${esc(p)}</b><span class="muted">${where}</span></div><button class="x" id="sheet-close" aria-label="Close">×</button></div>${body}</div></div>`;
+}
+
+/* ---------- rendering ---------- */
+let seedTop={};
+function refreshSeeds(){ seedTop={}; seeding().filter(r=>r.seed>0).slice(0,S('seedBadges')).forEach((r,i)=> seedTop[r.name]=i+1); }
+let liveTop={};
+function refreshLive(){ liveTop={}; if(tab!=='night' || night.phase!=='live' || !tonightGames().length) return; tonight().filter(r=>r.g>0).slice(0,S('liveBadges')).forEach((r,i)=> liveTop[r.name]=i+1); }
+const nm = p => esc(p)+(liveTop[p]?`<span class="liveno" title="Tonight’s live rank">(${liveTop[p]})</span>`:'')+(seedTop[p]?`<span class="seedno" title="Overall seed">(${seedTop[p]})</span>`:'');
+// Running the night is locked to the ref; only the password's SHA-256 hash is stored.
+const REF_HASH='239b052ff6654980bb7ac3c9e589564708f6428a850ffbf40b1e336ab6f85066';
+// Roles come from logins: the league manager's email is fixed; refs are emails the LM adds in LM Tools.
+const LM_EMAIL='ragy_labib@hotmail.com';
+let ref=false, refErr='', me=null, refsList=[], authApi=null, authMode='signin', authMsg=null, authBusy=false, backTab='seed';
+function applyRoles(){ const e = me && me.verified ? me.email : ''; const lm = e===LM_EMAIL; ref = lm || (!!e && refsList.includes(e)); unlocked = lm; const b=$('#acct'); if(b) b.textContent = me ? (lm?'LM':ref?'Ref':'Account') : 'Sign in'; }
+function setRef(v){ ref=v; try{ v?sessionStorage.setItem('gp-ref','1'):sessionStorage.removeItem('gp-ref'); }catch(e){} }
+function refForm(){ return me ? (me.verified ? `<p class="muted">You’re signed in as ${esc(me.email)}, which isn’t set up as a ref. Ask the league manager to add you in LM Tools.</p>` : verifyBox()) : `<div class="refbox"><p class="muted">Refs and the league manager sign in to run the night.</p><button class="btn primary" data-go="acct">Sign in</button></div>`; }
+function verifyBox(){ return `<div class="refbox"><p><b>Confirm your email.</b> We sent a link to ${esc(me.email)}. Tap it, then come back here.</p><div class="row"><button class="btn primary" id="auth-check">I’ve confirmed</button><button class="btn" id="auth-resend">Send the link again</button></div>${authMsg?`<p class="${authMsg.err?'err-text':'muted'}">${esc(authMsg.t)}</p>`:''}</div>`; }
+function acctView(){
+  if(!authApi) return `<h2>Account</h2><div class="banner warn">Sign-in isn’t available right now. Check your connection and reload the page.</div>`;
+  const m = authMsg ? `<p class="${authMsg.err?'err-text':'muted'}">${esc(authMsg.t)}</p>` : '';
+  if(me) return `<h2>Account</h2><p>Signed in as <b>${esc(me.email)}</b>.</p><p class="muted">${!me.verified?'Email not confirmed yet.':me.email===LM_EMAIL?'League manager: you can run nights and use LM Tools.':ref?'Ref: you can set up and run nights.':'This account can view everything. The league manager can add you as a ref in LM Tools.'}</p>${!me.verified?verifyBox():''}<div class="actions"><button class="btn" id="auth-out">Sign out</button></div>`;
+  const title = authMode==='signup'?'Create an account':authMode==='reset'?'Reset your password':'Sign in';
+  return `<h2>${title}</h2><p class="muted">${authMode==='signup'?'For refs and the league manager. Use the email the league manager added for you.':authMode==='reset'?'We’ll email you a link to choose a new password.':'Only refs and the league manager need to sign in. Everyone else can view without an account.'}</p>
+  <form class="refbox" id="authform"><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" required>
+  ${authMode!=='reset'?`<label for="auth-pw" style="margin-top:10px">Password</label><input id="auth-pw" type="password" autocomplete="${authMode==='signup'?'new-password':'current-password'}" required minlength="6">`:''}
+  <div class="row" style="margin-top:12px"><button class="btn primary" type="submit" ${authBusy?'disabled':''}>${authMode==='signup'?'Create account':authMode==='reset'?'Send reset link':'Sign in'}</button></div>${m}</form>
+  <div class="row auth-links">${authMode!=='signin'?'<button class="btn sm" data-amode="signin">Back to sign in</button>':''}${authMode!=='signup'?'<button class="btn sm" data-amode="signup">Create an account</button>':''}${authMode!=='reset'?'<button class="btn sm" data-amode="reset">Forgot password</button>':''}</div>`;
+}
+const AUTH_ERR = {'auth/invalid-credential':'That email and password don’t match.','auth/wrong-password':'That email and password don’t match.','auth/user-not-found':'There’s no account with that email. Create one first.','auth/email-already-in-use':'That email already has an account. Sign in instead.','auth/weak-password':'Use at least 6 characters for the password.','auth/invalid-email':'That email address doesn’t look right.','auth/too-many-requests':'Too many tries. Wait a few minutes and try again.','auth/network-request-failed':'No connection. Check your signal and try again.'};
+function lockView(){ return `<h2>Tonight</h2><div class="banner">No night is running right now. A ref or the league manager sets up the night.</div>${refForm()}`; }
+function render(){
+  refreshSeeds(); refreshLive();
+  const v = night.phase==='live' ? night.venue : night.setup.venue;
+  document.documentElement.dataset.venue = tab==='night' && v ? v : (night.phase==='live' && night.venue) ? night.venue : 'recess';
+  const shown = (tab==='night' && v) || (night.phase==='live' && night.venue);
+  $('#venue-name').textContent = shown && VENUES[shown] ? VENUES[shown].name : '';
+  document.querySelectorAll('nav button').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===tab));
+  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? liveView(!ref) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
+}
+const pts = n => `<span class="pts">${n}</span>`;
+function rankTable(rows, opts={}){
+  return `<div class="tablewrap"><table><thead><tr><th></th><th>Player</th><th class="n">Pts</th><th class="n">W–L</th><th class="n">Games</th></tr></thead><tbody>${rows.map((r,i)=>`<tr class="${i===0?'top':''}"><td class="rank">${i+1}</td><td>${esc(r.name)}${opts.left&&opts.left.includes(r.name)?' <span class="muted">(left)</span>':''}</td><td class="n">${pts(r.pts)}</td><td class="n">${r.w}–${r.g-r.w}</td><td class="n">${r.gw}–${r.gl}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function setupView(){
+  const s=night.setup, names=setupNames(), k=s.courts, filled=names.filter(Boolean).length, need=k*4;
+  const missing = names.slice(0,need).filter(n=>!n).length;
+  const order = seeding().map(x=>x.name);
+  const known = [...new Set([...roster, ...nights.flatMap(n=>n.players||[])])].filter(p=>!isInactive(p)||names.includes(p)).sort((a,b)=> (b===justAdded)-(a===justAdded) || (order.indexOf(a)<0?1e9:order.indexOf(a))-(order.indexOf(b)<0?1e9:order.indexOf(b)) || a.localeCompare(b));
+  const full = names.every(Boolean);
+  const chips = known.map(p=>{ const at=names.indexOf(p); return `<button class="chip pickchip${at>=0?' on':''}${p===justAdded&&at<0?' fresh':''}" data-pick="${esc(p)}" aria-pressed="${at>=0}" ${at<0&&full?'disabled':''}>${at>=0?`<span class="slotno">${at+1}</span>`:''}${nm(p)}</button>`; }).join('');
+  const step = (id,label,val,min,max,unit) => `<div class="stepper"><label>${label}</label><div class="step"><button class="btn sm" data-step="${id}" data-d="-1" ${val<=min?'disabled':''} aria-label="Fewer ${unit}">−</button><span class="count">${val}</span><button class="btn sm" data-step="${id}" data-d="1" ${val>=max?'disabled':''} aria-label="More ${unit}">+</button></div></div>`;
+  const rows = names.map((p,i)=>{
+    const ci=Math.floor(i/4), sub=ci>=k, lab = sub ? 'Sub' : courtName(ci,k);
+    const head = !sub && i%4===0 ? `<div class="tier-lab${k>1&&ci===k-1?' gul':''}">${lab}</div>` : sub && i===need ? `<div class="tier-lab sub">Gulag subs</div>` : '';
+    return `${head}<div class="arr-row${sub?' extra':''}"><span class="arr-num">${i+1}</span><input id="name-${i}" data-name="${i}" autocomplete="off" autocapitalize="words" placeholder="${sub?'Sub (optional)':'Tap a name above or type'}" value="${esc(p)}">${p?`<button class="x" data-clear="${i}" aria-label="Clear ${esc(p)}">×</button>`:'<span></span>'}</div>`;
+  }).join('');
+  return `
+  ${justEnded?`<div class="saved-night">${summaryCard(justEnded,'Night saved')}<button class="btn sm" id="sum-dismiss">Done</button></div>`:''}
+  <h2>Where are you playing?</h2>
+  <div class="venues" role="radiogroup" aria-label="Venue">${Object.entries(VENUES).map(([k,v])=>`<button class="venue${s.venue===k?' on':''}" role="radio" aria-checked="${s.venue===k}" data-venue="${k}"><b>${v.name}</b></button>`).join('')}</div>
+  <h2>Set up tonight</h2>
+  <div class="setup-grid">${step('courts','Courts',k,1,MAXC,'courts')}${step('subs','Gulag subs',s.subs,0,MAXS,'subs')}</div>
+  <p class="muted">${need+s.subs} players: ${k>1?`${k-1} tier${k>2?'s':''} plus the gulag`:'one court'}${s.subs?`, ${s.subs} sub${s.subs>1?'s':''} waiting on the gulag`:''}. Write names in arrival order. First in play Tier 1.</p>
+  <div class="played"><div class="played-head"><b>${known.length?'Played before':'Players'}</b><span class="muted">${known.length?'Tap in arrival order. Tap again to take them off.':'Add players below in arrival order.'}</span></div>${known.length?`<div class="chips">${chips}</div>`:''}
+  <form class="row newp" id="newpform"><input id="newp" autocomplete="off" placeholder="New player name" aria-label="New player name"><button class="btn sm primary" type="submit">Add</button></form>${addNote?`<p class="muted add-note">${esc(addNote)}</p>`:''}</div>
+  <div class="arrivals">${rows}</div>
+  <div class="row" style="justify-content:space-between"><span class="count ${missing?'bad':'ok'}">${filled} of ${need+s.subs}</span><span class="muted">${!s.venue?'Pick a venue':missing?`${missing} court spot${missing>1?'s':''} still empty`:'Ready to play'}</span></div>
+  <div class="actions"><button class="btn primary" id="start" ${missing||!s.venue?'disabled':''}>Start the night</button>${filled?'<button class="btn" id="clear">Reset</button>':''}</div>`;
+}
+function courtView(c,i,n,ro){
+  const g = n>1 && i===n-1, tag=courtTag(i,n);
+  const st = !c.pairs ? '<span class="state">Pick partners</span>' : c.winner==null ? '<span class="state playing">Playing</span>' : '<span class="state">Done</span>';
+  let body;
+  if(!c.pairs){
+    const opts = allOptions(c).map((o,k)=>`<button class="opt" data-opt="${i}:${k}">${o.map(t=>t.map(nm).join(' &amp; ')).join(' <span class="muted">vs</span> ')}</button>`).join('');
+    body = `<div class="slots"><div class="slot"><div class="lab">${esc(c.aLab)}</div><b>${c.a.map(x=>pb(x,ro)).join('<br>')}</b></div><div class="slot"><div class="lab">${esc(c.bLab)}</div><b>${c.b.map(x=>pb(x,ro)).join('<br>')}</b></div></div>
+    ${ro?'':`<div class="opts"><div class="lab">Or pick the teams yourself</div>${opts}</div>`}`;
+  } else {
+    const upHint = i===0||n===1 ? 'Stays on Tier 1' : 'Levels up';
+    const downHint = g ? (night.bench.length?'Subbed off':'Stays in the gulag') : n===1 ? 'Stays on' : 'Drops a tier';
+    body = c.pairs.map((pr,t)=>{
+      const won=c.winner===t, lost=c.winner===1-t, sc=c.score&&c.score[t];
+      return `<div class="team${won?' won':''}"><div class="tn"><b>${pr.map(x=>pb(x,ro)).join(' &amp; ')}</b><span class="hint">${won?upHint:lost?downHint:'Games won'}</span></div>
+      ${ro?`<span class="g-score big">${sc!=null?sc:'–'}</span>`:`<div class="sc" role="group" aria-label="Games won by ${pr.map(esc).join(' and ')}">${[0,1,2,3].map(v=>`<button class="sv${sc===v?' on':''}" data-score="${i}:${t}:${v}" aria-pressed="${sc===v}">${v}</button>`).join('')}</div>`}</div>`;
+    }).join('') + `<div class="court-foot"><span class="muted">${c.winner!=null?`Final ${c.score[0]}–${c.score[1]}`:'First to 3 games'}</span>${ro||(c.score&&(c.score[0]!=null||c.score[1]!=null))?'':`<button class="btn sm" data-redraw="${i}">Change partners</button>`}</div>`;
+  }
+  return `<section class="court${g?' gulag':''}"><div class="court-head"><span><span class="name">${courtName(i,n)}</span>${tag?`<span class="tag">${tag}</span>`:''}</span>${st}</div>${body}</section>`;
+}
+/* ---------- earlier rounds tonight: view and fix scores ---------- */
+let viewRound=null, rDraft=null, rErr='';
+function roundTabs(){
+  const done=[...new Set(night.log.map(g=>g.round))].sort((a,b)=>a-b); if(!done.length) return '';
+  return `<div class="segs round-tabs" role="group" aria-label="Choose a round">${done.map(r=>`<button class="seg${viewRound===r?' on':''}" data-vround="${r}" aria-pressed="${viewRound===r}"><b>Round ${r}</b></button>`).join('')}<button class="seg${viewRound===null?' on':''}" data-vround="live" aria-pressed="${viewRound===null}"><b>Round ${night.round}</b><small>Live</small></button></div>`;
+}
+const fmtScore = g => g.score&&g.score[0]!=null&&g.score[1]!=null ? `${g.score[0]}–${g.score[1]}` : '–';
+function flipsIn(draft){ return draft.filter(g=>{ const o=night.log.find(x=>x.round===g.round&&x.court===g.court); return o && o.winner!=null && g.winner!=null && o.winner!==g.winner; }); }
+function canRedoLineup(r){ return r===night.round-1 && (night.undo||[]).length && !night.courts.some(c=>c.score&&(c.score[0]!=null||c.score[1]!=null)); }
+function pastRoundView(){
+  const r=viewRound, editing=!!rDraft, games=(editing?rDraft:night.log.filter(g=>g.round===r)).slice().sort((a,b)=>a.court-b.court);
+  let bar;
+  if(editing && confirming==='flip'){
+    const F=flipsIn(rDraft), redo=canRedoLineup(r);
+    bar=`<div class="confirm"><p><b>This changes who won.</b></p>${F.map(g=>`<p>${courtName(g.court,g.courts||1)}: ${esc(tm(g.pairs[g.winner]))} now beat ${esc(tm(g.pairs[1-g.winner]))} ${fmtScore({score:[g.score[g.winner],g.score[1-g.winner]]})}.</p>`).join('')}
+      <p>Tonight’s ranking updates either way. ${redo?`Round ${night.round} hasn’t started scoring, so you can also redo its lineup with the corrected result.`:`Later rounds were already set up from the old result, so nobody will be moved.`}</p>
+      <div class="row">${redo?`<button class="btn primary" id="rsave-redo">Save and redo round ${night.round} lineup</button>`:''}<button class="btn${redo?'':' primary'}" id="rsave-keep">Save${redo?', keep lineup':''}</button><button class="btn" id="rflip-back">Back</button></div></div>`;
+  } else if(editing) bar=`<div class="edit-bar"><span class="muted">Fixing round ${r}. Round ${night.round} stays as it is.</span><div class="row"><button class="btn primary sm" id="rsave">Save changes</button><button class="btn sm" id="rcancel">Cancel</button></div>${rErr?`<p class="err-text">${esc(rErr)}</p>`:''}</div>`;
+  else if(lockPrompt==='round') bar=`<form class="edit-bar" id="pwform"><label for="pw">Password to edit scores</label><div class="row"><input id="pw" type="password" autocomplete="off"><button class="btn primary sm" type="submit">Unlock</button><button class="btn sm" type="button" id="pwcancel">Cancel</button></div>${pwErr?`<p class="err-text">${esc(pwErr)}</p>`:''}</form>`;
+  else bar=`<div class="edit-bar"><button class="btn sm" id="redit">Edit round ${r} scores</button></div>`;
+  const cards=games.map(g=>{ const n=g.courts||1, gi=editing?rDraft.indexOf(g):-1;
+    return `<section class="court${n>1&&g.court===n-1?' gulag':''}"><div class="court-head"><span class="name">${courtName(g.court,n)}</span><span class="state">${editing?'Editing':'Final '+fmtScore(g)}</span></div>
+    ${g.pairs.map((pr,t)=>`<div class="team${g.winner===t?' won':''}"><div class="tn"><b>${pr.map(nm).join(' &amp; ')}</b><span class="hint">${g.winner===t?'Won':g.winner===1-t?'Lost':'Games won'}</span></div>${editing?`<div class="sc">${[0,1,2,3].map(v=>`<button class="sv${g.score&&g.score[t]===v?' on':''}" data-rscore="${gi}:${t}:${v}" aria-pressed="${!!(g.score&&g.score[t]===v)}">${v}</button>`).join('')}</div>`:`<span class="g-score big">${g.score&&g.score[t]!=null?g.score[t]:'–'}</span>`}</div>`).join('')}</section>`; }).join('');
+  return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${r}</h2><button class="btn sm" data-vround="live">Back to round ${night.round}</button></div>${bar}${cards}`;
+}
+/* ---------- LM tools (league manager), password protected ---------- */
+let restorePlan=null, pendingSeason='', lmErr='', lmMsg={}, lmOpen=new Set(['players']), mergeSel=['',''], manual=null, showAllLog=false;
+const LMSEC = (key, title, body, sub='') => `<details class="lm-sec" data-lm="${key}"${lmOpen.has(key)?' open':''}><summary><b>${title}</b>${sub?`<span class="muted">${sub}</span>`:''}</summary><div class="lm-body">${body}</div></details>`;
+const note = k => lmMsg[k] ? `<p class="lm-note${lmMsg[k].err?' err-text':''}">${esc(lmMsg[k].t)}</p>` : '';
+const nameOpts = (sel, none='Choose a player') => `<option value="">${none}</option>`+[...new Set(knownNames())].sort((a,b)=>a.localeCompare(b)).map(p=>`<option value="${esc(p)}"${p===sel?' selected':''}>${esc(p)}</option>`).join('');
+const fmtWhen = iso => { const d=new Date(iso); return d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); };
+function blankManual(){ return {date:'', venue:night.setup.venue||'recess', courts:3, games:[{round:1,court:0,p:['','','',''],score:[null,null]}]}; }
+function lmView(){
+  if(!unlocked) return `<h2>LM Tools</h2><p class="muted">League manager tools.</p>${me&&me.verified?`<div class="banner">You’re signed in as ${esc(me.email)}. LM Tools are only for the league manager’s account.</div>`:me?verifyBox():`<div class="refbox"><p class="muted">Sign in with the league manager account to continue.</p><button class="btn primary" data-go="acct">Sign in</button></div>`}`;
+  const played=new Set(nights.flatMap(n=>n.players||[])), names=[...roster].sort((a,b)=>a.localeCompare(b));
+  // 1. players
+  const row=p=>`<li class="lm-row${isInactive(p)?' off':''}">${renaming===p?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(p)}" autocomplete="off" aria-label="New name for ${esc(p)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`
+    :`<span class="lm-name">${esc(p)}${isInactive(p)?' <span class="tagx">Inactive</span>':''}${played.has(p)?'':' <span class="muted">(no games yet)</span>'}</span><span class="lm-act"><button class="btn sm" data-ren="${esc(p)}">Rename</button><button class="btn sm" data-active="${esc(p)}">${isInactive(p)?'Make active':'Make inactive'}</button>${confirming==='rm:'+p?`<button class="btn sm danger" data-rmyes="${esc(p)}">Confirm remove</button><button class="btn sm" id="rm-no">Cancel</button>`:`<button class="btn sm danger" data-rm="${esc(p)}">Remove</button>`}</span>`}</li>`;
+  const players = `<p class="muted">Inactive players stay in the seeding and history but don’t show in setup or name suggestions. Remove takes someone off the list completely; their past games stay.</p><ul class="lm-list">${names.map(row).join('')}</ul>`;
+  // 2. merge
+  const merge = `<p class="muted">Combine two names for the same person. Every game and result of the first moves to the second, and the first name disappears.</p>
+    <div class="lm-grid"><label>Merge<select id="merge-a">${nameOpts(mergeSel[0])}</select></label><label>Into<select id="merge-b">${nameOpts(mergeSel[1])}</select></label></div>
+    ${confirming==='merge-go'&&mergeSel[0]&&mergeSel[1]?`<div class="confirm"><p>Merge <b>${esc(mergeSel[0])}</b> into <b>${esc(mergeSel[1])}</b>? This can’t be undone.</p><div class="row"><button class="btn danger" id="merge-yes">Merge</button><button class="btn" id="end-no">Cancel</button></div></div>`:`<button class="btn primary" id="merge-go">Merge players</button>`}${note('merge')}`;
+  // 3. bulk add
+  const bulk = `<p class="muted">Paste or type names, one per line.</p><textarea id="bulk-in" class="copybox" rows="6" placeholder="James. S&#10;Dazza&#10;Peter. A"></textarea><button class="btn primary" id="bulk-go">Add all</button>${note('bulk')}`;
+  // 4. starting ratings
+  const R=settings.ratings||{}, rated=Object.keys(R).sort((a,b)=>a.localeCompare(b));
+  const ratings = `<p class="muted">Everyone starts at 1000. Give a strong newcomer a higher start so their early wins aren’t counted as upsets. Rough guide: 900 beginner, 1000 average, 1100 strong, 1200 very strong.</p>
+    <div class="lm-grid"><label>Player<select id="rate-p">${nameOpts('')}</select></label><label>Starting rating<input id="rate-v" type="number" inputmode="numeric" min="600" max="1600" step="25" value="1100"></label></div><button class="btn primary" id="rate-go">Set starting rating</button>${note('rate')}
+    ${rated.length?`<ul class="lm-list">${rated.map(p=>`<li class="lm-row"><span class="lm-name">${esc(p)}: ${R[p]}</span><button class="btn sm" data-rateclear="${esc(p)}">Back to 1000</button></li>`).join('')}</ul>`:''}`;
+  // point adjustments
+  const cs0=currentSeason(), adjAll=(settings.adjust||[]).map((a,i)=>({...a,i})), adjNow=adjAll.filter(a=>!cs0.start||a.at>=cs0.start).reverse();
+  const pointsBody = `<p class="muted">Adds to or takes away from a player’s seed points this season, for example a bonus for reffing or a penalty for a no-show. It shows on the Seeding page.</p>
+    <div class="lm-grid"><label>Player<select id="adj-p">${nameOpts('')}</select></label><label>Points (use − to remove)<input id="adj-v" type="number" inputmode="numeric" step="1" placeholder="e.g. 5 or -5"></label><label>Reason (optional)<input id="adj-r" maxlength="60" placeholder="e.g. Reffed the night"></label></div>
+    <button class="btn primary" id="adj-go">Apply</button>${note('adj')}
+    ${adjNow.length?`<ul class="lm-list">${adjNow.map(a=>`<li class="lm-row"><span class="lm-name">${esc(a.name)}: <span class="${a.pts>0?'pos':'neg'}">${a.pts>0?'+':''}${a.pts}</span>${a.reason?`<span class="muted"> · ${esc(a.reason)}</span>`:''}<span class="muted"> · ${new Date(a.at).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</span></span><button class="btn sm" data-adjdel="${a.i}">Undo</button></li>`).join('')}</ul>`:''}`;
+  // 5. nights
+  const hs=history().nights.slice().reverse();
+  const nightsBody = hs.length ? hs.map(({nt})=>{ const editing=editNight===nt.date;
+    return `<div class="lm-night${editing?' editing':''}"><div class="lm-row"><span class="lm-name">${esc(nightLabel(nt))}<span class="muted"> · ${nt.players.length} players · ${nt.rounds} rounds${nt.manual?' · added by hand':''}</span></span>${editing?'':`<button class="btn sm" data-hedit="${esc(nt.date)}">Edit or delete</button>`}</div>${editing?editTools(nt.date,true)+gameLog(nt,true):''}</div>`; }).join('') : '<p class="muted">No saved nights yet.</p>';
+  // 6. add a past night
+  const M=manual||(manual=blankManual());
+  const courtSel=(gi,v)=>`<select data-mcourt="${gi}" aria-label="Court">${Array.from({length:M.courts},(_,i)=>`<option value="${i}"${i===v?' selected':''}>${courtName(i,M.courts)}</option>`).join('')}</select>`;
+  const pin=(gi,k,v)=>`<input data-mn="${gi}:${k}" value="${esc(v)}" placeholder="Player" autocomplete="off" autocapitalize="words" aria-label="Player">`;
+  const mgame=(g,gi)=>{ const w=g.score[0]===3&&g.score[1]!==3?0:g.score[1]===3&&g.score[0]!==3?1:null;
+    return `<div class="mgame"><div class="mgame-top"><label>Round<input data-mround="${gi}" type="number" min="1" max="30" value="${g.round}" inputmode="numeric"></label><label>Court${courtSel(gi,g.court)}</label><button class="x" data-mdel="${gi}" aria-label="Remove this game">×</button></div>
+    ${[0,1].map(t=>`<div class="mteam${w===t?' won':''}"><div class="mpair">${pin(gi,t*2,g.p[t*2])}${pin(gi,t*2+1,g.p[t*2+1])}</div><div class="sc">${[0,1,2,3].map(v=>`<button class="sv sm${g.score[t]===v?' on':''}" data-mscore="${gi}:${t}:${v}">${v}</button>`).join('')}</div></div>`).join('<div class="mvs">vs</div>')}</div>`; };
+  const addNight = `<p class="muted">For nights played before the app. Enter each game with its scores; the night then counts in History and the seeding.</p>
+    <div class="lm-grid three"><label>Date<input id="m-date" type="date" value="${esc(M.date)}"></label><label>Venue<select id="m-venue">${Object.entries(VENUES).map(([k,v])=>`<option value="${k}"${M.venue===k?' selected':''}>${v.name}</option>`).join('')}</select></label><label>Courts<select id="m-courts">${[1,2,3,4,5,6,7,8].map(n=>`<option${n===M.courts?' selected':''}>${n}</option>`).join('')}</select></label></div>
+    ${M.games.map(mgame).join('')}<div class="row"><button class="btn" id="m-add">Add game</button><button class="btn primary" id="m-save">Save night</button><button class="btn" id="m-clear">Clear</button></div>${note('manual')}`;
+  // 8. seeding settings
+  const num=(k,label,min,max)=>`<label>${label}<input data-rule="${k}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${S(k)}"></label>`;
+  const rules = `<p class="muted">Changes apply to every saved night straight away.</p><div class="lm-grid">${num('win','Points for a win',0,50)}${num('tier','Bonus per tier above the gulag',0,20)}${num('upset','Top upset bonus',0,30)}${num('carry','Top carry bonus',0,30)}${num('fullWeeks','Weeks that count in full',1,52)}${num('halfWeeks','Weeks that count half (total)',1,104)}${num('seedBadges','Seed (x) badges for top',0,20)}${num('liveBadges','Tonight’s live (x) for top',0,20)}</div>
+    <div class="row"><button class="btn primary" id="rules-save">Save settings</button><button class="btn" id="rules-reset">Back to defaults</button></div>${note('rules')}`;
+  // 9. seasons
+  const cs=currentSeason(), past=pastSeasons();
+  const seasons = `<p class="muted">Start a fresh season to reset the seeding. Past seasons stay viewable on the Seeding tab. Ratings carry on across seasons.</p>
+    <div class="lm-row"><span class="lm-name">Current: ${esc(cs.name)}<span class="muted"> · since ${cs.start?new Date(cs.start).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'the first night'}</span></span></div>
+    <div class="lm-grid"><label>Rename this season<input id="season-name" value="${esc(cs.name)}"></label><label>New season name<input id="season-new" placeholder="e.g. Summer 2026"></label></div>
+    <div class="row"><button class="btn" id="season-rename">Rename this season</button>${confirming==='season'?`<button class="btn danger" id="season-yes">Yes, start it now</button><button class="btn" id="end-no">Cancel</button>`:`<button class="btn primary" id="season-start">Start new season</button>`}</div>${note('season')}
+    ${past.length?`<ul class="lm-list">${past.slice().reverse().map(p=>`<li class="lm-row"><span class="lm-name">${esc(p.name)}<span class="muted"> · ${new Date(p.start||p.end).toLocaleDateString(undefined,{day:'numeric',month:'short'})} to ${new Date(p.end).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span></span></li>`).join('')}</ul>`:''}`;
+  // 13. backup
+  const backup = `<p class="muted">Save a copy of everything to your phone or computer. Keep one after big nights.</p><div class="row"><button class="btn primary" id="dl-csv">Download results (CSV)</button><button class="btn" id="dl-json">Download full backup (JSON)</button></div>${note('backup')}`;
+  // 14. password (logins are handled by Firebase)
+  const pw = `<p class="muted">You’re signed in as ${esc(me?me.email:'')}. To change your password, we’ll email you a reset link.</p><button class="btn primary" id="pw-reset">Email me a reset link</button>${note('pw')}`;
+  // refs
+  const refsBody = `<p class="muted">Refs can set up and run nights, enter scores and fix earlier rounds. They create an account on this site with the email you add here, then confirm it from their inbox.</p>
+    <form class="row" id="refaddform"><input id="ref-email" type="email" placeholder="ref@email.com" autocomplete="off" style="flex:1;min-width:0"><button class="btn primary" type="submit">Add ref</button></form>${note('refs')}
+    ${refsList.length?`<ul class="lm-list">${refsList.map(e=>`<li class="lm-row"><span class="lm-name">${esc(e)}</span><button class="btn sm danger" data-refdel="${esc(e)}">Remove</button></li>`).join('')}</ul>`:'<p class="muted">No refs yet. You can run nights yourself as league manager.</p>'}`;
+  // restore
+  const restore = `<p class="muted">Bring players, nights, settings and the change log in from a Gulag Padel backup file (for example the one downloaded from the old Claude version). Nights already here are skipped, so it’s safe to run twice.</p><input type="file" id="restore-file" accept=".json,application/json">${restorePlan?`<div class="confirm"><p>This backup has <b>${restorePlan.nights.length}</b> night${restorePlan.nights.length===1?'':'s'} to add${restorePlan.skip?` (${restorePlan.skip} already here)`:''}, <b>${restorePlan.newPlayers.length}</b> new player${restorePlan.newPlayers.length===1?'':'s'} and the settings.</p><div class="row"><button class="btn primary" id="restore-go">Import</button><button class="btn" id="restore-no">Cancel</button></div></div>`:''}${note('restore')}`;
+  // 7. change log
+  const L=changelog.slice(0, showAllLog?300:30);
+  const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
+  return `<div class="row" style="justify-content:space-between;align-items:center"><h2>LM Tools</h2><button class="btn sm" id="lmlock">Lock</button></div>
+  ${LMSEC('players',`Players (${names.length})`,players)}
+  ${LMSEC('merge','Merge duplicates',merge)}
+  ${LMSEC('bulk','Add players in bulk',bulk)}
+  ${LMSEC('points','Add or remove points',pointsBody, adjNow.length?`${adjNow.length} this season`:'')}
+  ${LMSEC('ratings','Starting ratings',ratings, rated.length?`${rated.length} set`:'')}
+  ${LMSEC('nights',`Nights (${hs.length})`,nightsBody,'Edit scores or delete')}
+  ${LMSEC('manual','Add a past night',addNight)}
+  ${LMSEC('rules','Seeding settings',rules)}
+  ${LMSEC('seasons','Seasons',seasons, esc(cs.name))}
+  ${LMSEC('backup','Backup and export',backup)}
+  ${LMSEC('refs',`Refs (${refsList.length})`,refsBody)}
+  ${LMSEC('restore','Restore from backup',restore)}
+  ${LMSEC('pw','Change password',pw)}
+  ${LMSEC('log','Change log',log, changelog.length?`${changelog.length} entries`:'')}`;
+}
+async function saveManual(){
+  const M=manual, msg=t=>{ lmMsg.manual={t,err:true}; render(); };
+  if(!M.date) return msg('Pick the date of the night.');
+  if(!M.games.length) return msg('Add at least one game.');
+  for(const [i,g] of M.games.entries()){
+    const p=g.p.map(x=>(x||'').trim()); if(p.some(x=>!x)) return msg(`Game ${i+1} needs four players.`);
+    if(new Set(p.map(x=>x.toLowerCase())).size<4) return msg(`Game ${i+1} has the same player twice.`);
+    const [a,b]=g.score; if(!((a===3&&b!=null&&b<3)||(b===3&&a!=null&&a<3))) return msg(`Game ${i+1} needs both scores, with one team on 3.`);
+  }
+  const canon=x=>{ const t=x.trim().replace(/\s+/g,' '); return knownNames().find(n=>n.toLowerCase()===t.toLowerCase())||t; };
+  let date=new Date(M.date+'T19:00:00').toISOString(); while(nights.some(n=>n.date===date)) date=new Date(new Date(date).getTime()+1000).toISOString();
+  const games=M.games.map(g=>{ const p=g.p.map(canon); return {round:+g.round||1, court:Math.min(+g.court||0,M.courts-1), courts:M.courts, pairs:[[p[0],p[1]],[p[2],p[3]]], score:[g.score[0],g.score[1]], winner:g.score[0]===3?0:1}; });
+  const players=[...new Set(games.flatMap(g=>g.pairs.flat()))];
+  const rec={venue:M.venue, date, players, left:[], games, rounds:Math.max(...games.map(g=>g.round)), manual:true};
+  if(db){ try{ await db.collection('nights').add(rec); }catch(e){ return msg('Couldn’t save the night. Check your connection and try again.'); } }
+  if(!nights.some(n=>n.date===date)) nights.unshift(rec);
+  players.forEach(p=>{ if(!roster.includes(p)) roster.push(p); }); saveRoster(); if(!db) lsSave();
+  logChange(`Added a past night by hand: ${nightLabel(rec)} (${games.length} games)`);
+  manual=blankManual(); lmMsg.manual={t:`Saved. ${games.length} game${games.length>1?'s':''} added to History and the seeding.`}; render();
+}
+function saveRefs(){ if(db && db.raw) db.raw('club/access').set({refs:refsList}).catch(()=>setStatus('Couldn’t save the ref list',true)); }
+$('#main').addEventListener('change', async e=>{
+  if(e.target.id!=='restore-file' || !e.target.files[0]) return;
+  try{
+    const d=JSON.parse(await e.target.files[0].text());
+    if(!d || !Array.isArray(d.nights) || !Array.isArray(d.roster)) throw 0;
+    const have=new Set(nights.map(n=>n.date)), add=d.nights.filter(n=>n&&n.date&&!have.has(n.date));
+    const names=new Set(knownNames().map(n=>n.toLowerCase()));
+    restorePlan={data:d, nights:add, skip:d.nights.length-add.length, newPlayers:[...new Set([...d.roster, ...add.flatMap(n=>n.players||[])])].filter(n=>!names.has(String(n).toLowerCase()))}; lmMsg.restore=null;
+  }catch(err){ restorePlan=null; lmMsg.restore={t:'That file isn’t a Gulag Padel backup.',err:true}; }
+  render();
+});
+async function runRestore(){
+  const P=restorePlan; if(!P) return; restorePlan=null; lmMsg.restore={t:'Importing…'}; render();
+  try{
+    for(const n of P.nights){ const rec={...n}; delete rec._id; if(db) await db.collection('nights').add(rec); if(!nights.some(x=>x.date===rec.date)) nights.push(rec); }
+    roster=[...new Set([...roster, ...P.newPlayers])]; saveRoster();
+    const st=P.data.settings||{}; settings={...st, ...settings, rules:settings.rules||st.rules, ratings:{...(st.ratings||{}), ...(settings.ratings||{})}, inactive:[...new Set([...(st.inactive||[]), ...(settings.inactive||[])])], adjust:[...(st.adjust||[]), ...(settings.adjust||[])], seasons:settings.seasons||st.seasons}; delete settings.lmHash; saveSettings();
+    const seen=new Set(changelog.map(x=>x.at+x.what)); changelog=[...changelog, ...(P.data.changelog||[]).filter(x=>!seen.has(x.at+x.what))].sort((a,b)=>a.at<b.at?1:-1).slice(0,300);
+    logChange(`Imported a backup: ${P.nights.length} night${P.nights.length===1?'':'s'}, ${P.newPlayers.length} new player${P.newPlayers.length===1?'':'s'}`);
+    if(!db) lsSave();
+    lmMsg.restore={t:`Imported ${P.nights.length} night${P.nights.length===1?'':'s'} and ${P.newPlayers.length} new player${P.newPlayers.length===1?'':'s'}.`};
+  }catch(err){ lmMsg.restore={t:'The import stopped partway. Check your connection and run it again: nights already imported are skipped.',err:true}; }
+  render();
+}
+function csvCell(v){ v=String(v??''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+async function download(kind){
+  const stamp=new Date().toISOString().slice(0,10); let filename, data;
+  if(kind==='csv'){
+    const rows=[['Date','Venue','Round','Court','Team 1 player 1','Team 1 player 2','Team 2 player 1','Team 2 player 2','Team 1 games','Team 2 games','Winners']];
+    nights.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(nt=> (nt.games||[]).filter(g=>g.pairs&&g.winner!=null).slice().sort((x,y)=>x.round-y.round||x.court-y.court).forEach(g=>
+      rows.push([new Date(nt.date).toLocaleDateString(), nt.venue&&VENUES[nt.venue]?VENUES[nt.venue].name:'', g.round, courtName(g.court,g.courts||1), g.pairs[0][0], g.pairs[0][1], g.pairs[1][0], g.pairs[1][1], g.score?g.score[0]:'', g.score?g.score[1]:'', g.pairs[g.winner].join(' & ')])));
+    filename=`gulag-padel-results-${stamp}.csv`; data=rows.map(r=>r.map(csvCell).join(',')).join('\n');
+  } else {
+    const st={...settings}; delete st.lmHash;
+    filename=`gulag-padel-backup-${stamp}.json`;
+    data=JSON.stringify({app:'Gulag Padel', exportedAt:new Date().toISOString(), roster, settings:st, nights:nights.map(n=>{ const x={...n}; delete x._id; return x; }), changelog}, null, 2);
+  }
+  try{ const url=URL.createObjectURL(new Blob([data],{type:kind==='csv'?'text/csv':'application/json'})); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); lmMsg.backup={t:`Downloaded ${filename}.`}; }
+  catch(e){ lmMsg.backup={t:'Couldn’t download the file. Try again.',err:true}; }
+  render();
+}
+function startRoundEdit(){ rDraft=JSON.parse(JSON.stringify(night.log.filter(g=>g.round===viewRound))); rErr=''; confirming=null; render(); }
+function saveRound(redo){
+  if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; confirming=null; render(); return; }
+  const r=viewRound;
+  if(redo && canRedoLineup(r)){
+    const u=night.undo.slice(), prev=JSON.parse(u.pop());
+    rDraft.forEach(g=>{ const c=prev.courts[g.court]; if(c){ c.score=g.score; c.winner=g.winner; } });
+    prev.undo=u; night=fix(prev); rDraft=null; viewRound=null; confirming=null;
+    nextRound(); logChange(`Fixed round ${r} scores and redrew round ${night.round}`); setStatus(`Round ${r} fixed and round ${night.round} redrawn`); return;
+  }
+  night.log = night.log.map(x=> x.round===r ? (rDraft.find(g=>g.court===x.court)||x) : x);
+  logChange(`Fixed round ${r} scores during the night`); rDraft=null; confirming=null; saveNight(); render(); setStatus(`Round ${r} scores updated`);
+}
+
+function liveView(ro){
+  if(viewRound!==null && !night.log.some(g=>g.round===viewRound)) { viewRound=null; rDraft=null; }
+  if(viewRound!==null) return roundTabs()+pastRoundView()+`<h2>Tonight’s ranking</h2>${tonightGames().length?rankTable(tonight(),{left:night.left}):''}`;
+  const sl=slamState(night), C=night.courts, n=C.length, undrawn=C.some(c=>!c.pairs), courtsDone=n && C.every(c=>c.winner!=null), done=courtsDone && (!sl || sl.winner!=null);
+  const active=[...C.flatMap(c=>[...c.a,...c.b]), ...night.bench];
+  const top = ro ? '<span class="state playing live-pill">Live</span>' : !n ? '<span class="muted">No court running</span>' : undrawn ? '<button class="btn primary" id="draw">Flip for partners</button>' : done ? '<span class="muted">All scores in. Next round is below.</span>' : courtsDone ? '<span class="muted">Finish the point slam</span>' : '<span class="muted">Enter each court’s score</span>';
+  const canUndo = !ro && (night.undo||[]).length;
+  let check='';
+  if(!ro && confirming==='next' && done){
+    const P=nextPreview(), tag=x=>`<span class="nx-p"><span class="mv mv-${x.mv}">${MOVE_LABEL[x.mv]}</span>${esc(x.p)}</span>`;
+    check=`<div class="confirm nx-box"><p><b>Round ${night.round+1} lineup.</b> Check the moves, then confirm.</p>${P.courts.map(c=>`<div class="nx"><span class="nx-court${c.gul?' gul':''}">${c.name}</span><div class="nx-pl">${c.players.map(tag).join('')}</div></div>`).join('')}${P.bench.length?`<div class="nx"><span class="nx-court sub">Subs</span><div class="nx-pl">${P.bench.map(tag).join('')}</div></div>`:''}<div class="row"><button class="btn primary" id="next-yes">Confirm next round</button><button class="btn" id="next-no">Back</button></div></div>`;
+  } else if(!ro && confirming==='undo'){
+    check=`<div class="confirm"><p>Go back to round ${night.round-1}? Courts, partners and scores return to how they were before you tapped Next round. Anything changed since then is cleared.</p><div class="row"><button class="btn danger" id="undo-yes">Undo last round</button><button class="btn" id="end-no">Keep this round</button></div></div>`;
+  }
+  return `
+  ${ro?'':roundTabs()}
+  <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${night.round}</h2>${top}</div>
+  ${!ro&&(night.leaveUndo||[]).length?(()=>{ const u=night.leaveUndo[night.leaveUndo.length-1];
+    return confirming==='leaveundo' ? `<div class="confirm"><p>Give ${esc(u.p)} their spot back? Scores or changes made since they left will be cleared.</p><div class="row"><button class="btn danger" id="leave-undo-yes">Undo ${esc(u.p)} leaving</button><button class="btn" id="end-no">Cancel</button></div></div>`
+      : `<div class="leave-undo"><span><b>${esc(u.p)}</b> marked as left early.</span><button class="btn sm primary" id="leave-undo">Undo</button></div>`; })():''}
+  ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
+  <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
+  ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
+  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&night.bench.length>=4?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
+  ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
+  ${!ro&&done?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round</button>`}</div>`:''}
+  ${ro?'':`<form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Late arrival" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form>`}
+  <h2>Tonight’s ranking</h2>
+  ${tonightGames().length?rankTable(tonight(),{left:night.left}):'<p class="muted">Fills in as scores go in.</p>'}
+  ${ro?`<h2>Ref</h2>${refForm()}`:`${sheet?sheetView():''}
+  ${confirming==='reset'?`<div class="confirm"><p>Reset tonight? This clears all courts, partners and scores and takes you back to setup with the same names, so you can put everyone in the right spots. Games played so far won’t be saved.</p><div class="row"><button class="btn danger" id="reset-yes">Reset tonight</button><button class="btn" id="end-no">Keep playing</button></div></div>`:confirming==='end'?`<div class="confirm"><p>End the night and save it? Courts without a final score this round won’t count.</p><div class="row"><button class="btn danger" id="end-yes">End and save</button><button class="btn" id="end-no">Keep playing</button></div></div>`
+    :`<div class="actions"><button class="btn danger" id="end">End the night</button>${night.round===1&&!night.log.length&&!night.courts.some(c=>c.score&&(c.score[0]!=null||c.score[1]!=null))?'<button class="btn" id="reset">Reset tonight</button>':''}</div>`}`}`;
+}
+function refBar(){
+  const live = night.phase==='live';
+  if(!live) return '';
+  return `<div class="refbar">${live?`<button class="btn primary" data-go="night"><span class="dot"></span>Watch tonight live</button>`:''}</div>`;
+}
+let seedSel = 'overall', renaming = null, renameErr = '', editNames = false;
+async function renamePlayer(old, nw, why){
+  const sw = x => x===old ? nw : x, swa = a => a ? [...new Set(a.map(sw))] : a, swl = a => a ? a.map(sw) : a;
+  roster = swa(roster); saveRoster();
+  const N = night;
+  N.setup.names = swl(N.setup.names); N.arrivals = swa(N.arrivals); N.bench = swl(N.bench); N.left = swa(N.left);
+  N.courts.forEach(c=>{ c.a=swl(c.a); c.b=swl(c.b); if(c.pairs) c.pairs=c.pairs.map(swl); });
+  N.log.forEach(g=>{ if(g.pairs) g.pairs=g.pairs.map(swl); });
+  saveNight();
+  for(const nt of nights){
+    const uses = (nt.players||[]).includes(old) || (nt.games||[]).some(g=>(g.pairs||[]).some(pr=>pr.includes(old)));
+    if(!uses) continue;
+    nt.players = swa(nt.players); nt.left = swa(nt.left||[]);
+    (nt.games||[]).forEach(g=>{ if(g.pairs) g.pairs=g.pairs.map(swl); });
+    if(db && nt._id){ const rec={...nt}; delete rec._id; try{ await db.doc('nights/'+nt._id).set(rec); }catch(e){ setStatus('Couldn’t update every saved night. Try again', true); } }
+  }
+  const merged = !!(settings.inactive||[]).includes(nw) || false;
+  if(settings.inactive) settings.inactive=[...new Set(settings.inactive.map(sw))];
+  if(settings.adjust) settings.adjust=settings.adjust.map(a=>({...a, name:sw(a.name)}));
+  if(settings.ratings && settings.ratings[old]!=null){ if(settings.ratings[nw]==null) settings.ratings[nw]=settings.ratings[old]; delete settings.ratings[old]; }
+  saveSettings(); logChange(why || `Renamed ${old} to ${nw}`);
+  if(!db) lsSave();
+  renaming=null; renameErr=''; setStatus('Name updated'); render();
+}
+const nightLabel = nt => new Date(nt.date).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}) + (nt.venue&&VENUES[nt.venue] ? ' · '+VENUES[nt.venue].name : '');
+function seedView(){
+  const h=history().nights.reverse();
+  const past=pastSeasons(), cs=currentSeason();
+  if(seedSel!=='overall' && !String(seedSel).startsWith('season:') && !h.some(x=>x.nt.date===seedSel)) seedSel='overall';
+  if(String(seedSel).startsWith('season:') && !past[+seedSel.slice(7)]) seedSel='overall';
+  const VS={recess:'Recess',game4padel:'Game4Padel',colosso:'Colosso'};
+  const pill=(v,top,sub)=>`<button class="seg${seedSel===v?' on':''}" data-seedsel="${esc(v)}" aria-pressed="${seedSel===v}"><b>${top}</b>${sub?`<small>${sub}</small>`:''}</button>`;
+  const sel = h.length||past.length ? `<div class="segs" role="group" aria-label="Choose seeding">${pill('overall','Overall',past.length?esc(cs.name):'All nights')}${past.map((p,i)=>pill('season:'+i, esc(p.name), 'Past season')).reverse().join('')}${h.map(({nt})=>pill(nt.date, new Date(nt.date).toLocaleDateString(undefined,{day:'numeric',month:'short'}), nt.venue&&VS[nt.venue]?VS[nt.venue]:new Date(nt.date).getFullYear())).join('')}</div>` : '';
+  if(String(seedSel).startsWith('season:')){
+    const ps=past[+seedSel.slice(7)], t=seeding(ps).filter(r=>r.g);
+    return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">Final seeding for ${esc(ps.name)}, ${new Date(ps.start||ps.end).toLocaleDateString(undefined,{day:'numeric',month:'short'})} to ${new Date(ps.end).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}.</p>${t.length?`<div class="tablewrap"><table><thead><tr><th></th><th>Player</th><th class="n">Seed pts</th><th class="n">Nights</th><th class="n">W–L</th></tr></thead><tbody>${t.map((r,i)=>`<tr class="${i===0?'top':''}"><td class="rank">${i+1}</td><td>${esc(r.name)}</td><td class="n">${pts(r.seed)}</td><td class="n">${r.n}</td><td class="n">${r.w}–${r.g-r.w}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No games in this season.</p>'}`;
+  }
+  if(seedSel!=='overall'){
+    const {nt,st}=h.find(x=>x.nt.date===seedSel);
+    return `<h2>Seeding</h2>${refBar()}${sel}${summaryCard(nt.date,'Night summary')}<h2>Ranking that night</h2><p class="muted">${nt.players.length} players, ${nt.rounds} rounds.</p>${rankTable(rank(st),{left:nt.left||[]})}`;
+  }
+  const t = seeding().filter(r=>r.g||(roster.includes(r.name)&&!isInactive(r.name)));
+  // movement since the week before: compare with the seeding just before the most recent night this season
+  const csn=currentSeason(), seasonNights=nights.filter(n=>!csn.start||n.date>=csn.start).map(n=>n.date).sort(), lastN=seasonNights[seasonNights.length-1];
+  const prevRank={}; if(seasonNights.length>1) seeding(null,lastN).filter(r=>r.seed>0).forEach((r,i)=>prevRank[r.name]=i+1);
+  const moveCell=(name,now)=>{ if(seasonNights.length<2) return ''; const was=prevRank[name];
+    if(!was) return '<span class="mvx new" title="New to the seeding">New</span>';
+    const d=was-now; return d>0?`<span class="mvx up" title="Up ${d} since last week">▲${d}</span>`:d<0?`<span class="mvx down" title="Down ${-d} since last week">▼${-d}</span>`:'<span class="mvx same" title="No change">–</span>'; };
+  if(!t.length) return `<h2>Seeding</h2>${refBar()}<div class="banner">Seeding fills in once the first night is saved.</div>`;
+  return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">${past.length?`${esc(cs.name)}. `:''}Points from the last ${S('fullWeeks')} weeks count in full and weeks ${S('fullWeeks')+1} to ${S('halfWeeks')} count half, so regulars who keep winning rise and a one-off big night fades. Beating a stronger team earns up to ${S('upset')} bonus points. Rating shows current strength.</p>
+  <div class="tablewrap"><table><thead><tr><th></th><th class="mvh" title="Change since last week">+/–</th><th>Player</th><th class="n">Seed pts</th><th class="n">Nights</th><th class="n">W–L</th><th class="n">Rating</th><th></th></tr></thead><tbody>
+  ${t.map((r,i)=>`<tr class="${i===0&&r.seed?'top':''}"><td class="rank">${r.seed?i+1:'–'}</td><td class="mvc">${r.seed?moveCell(r.name,i+1):''}</td><td>${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`<span class="pname">${esc(r.name)}</span>${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td><td class="n">${pts(r.seed)}</td><td class="n">${r.n}</td><td class="n">${r.w}–${r.g-r.w}</td><td class="n">${r.rating}</td><td></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="actions">${!unlocked?'':`<button class="btn${editNames?' primary':''}" id="editnames">${editNames?'Done editing':'Edit names'}</button>${editNames?'<span class="muted">Tap Rename to fix a spelling, </span>':''}`}</div>
+  ${(()=>{ const cs=currentSeason(), A=(settings.adjust||[]).filter(a=>!cs.start||a.at>=cs.start); return A.length?`<p class="muted adj-note">Includes point adjustments: ${A.map(a=>`${esc(a.name)} ${a.pts>0?'+':''}${a.pts}${a.reason?` (${esc(a.reason)})`:''}`).join(', ')}.</p>`:''; })()}
+  <details class="pick"><summary>How points work</summary><ul class="rules"><li>Every game: 1 point per game won.</li><li>A win: ${S('win')} points, plus ${S('tier')} for each tier above the gulag.</li><li>Upset bonus: up to ${S('upset')} more for beating a team rated above yours (about ${Math.round(S('upset')/2)} for an even match).</li><li>Carry bonus: up to ${S('carry')} more for winning with a partner rated well below you. It starts at a 50-point rating gap and is full at 250.</li></ul></details>`;
+}
+// History editing is locked behind a password; only its SHA-256 hash is stored here.
+const EDIT_HASH='c1916a7b9210afea36583205e616f6320c6e22a2b277176051ce3f39b4b14512';
+const activeHash = () => settings.lmHash || EDIT_HASH;
+let unlocked=false, lockPrompt=null, pwErr='', editNight=null, draft=null, editErr='';
+async function sha256(t){ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function gameLog(nt, editing){
+  const src = editing ? draft : (nt.games||[]);
+  const games = src.map((g,gi)=>({g,gi})).filter(({g})=> g.pairs && (editing || g.winner!=null)).sort((x,y)=> x.g.round-y.g.round || x.g.court-y.g.court);
+  if(!games.length) return '<p class="muted">No games recorded.</p>';
+  let out='', last=null;
+  games.forEach(({g,gi})=>{
+    if(g.round!==last){ if(last!==null) out+='</div>'; out+=`<div class="round-lab">Round ${g.round}</div><div class="games">`; last=g.round; }
+    const n=g.courts||1, sc = g.score&&g.score[0]!=null&&g.score[1]!=null ? g.score : null;
+    const team = t => `<span class="${t===g.winner?'gw':''}">${g.pairs[t].map(nm).join(' &amp; ')}</span>`;
+    const court = `<span class="g-court${n>1&&g.court===n-1?' gul':''}">${courtName(g.court,n)}</span>`;
+    if(!editing){ out+=`<div class="game">${court}<span class="g-teams">${team(0)} <span class="muted">vs</span> ${team(1)}</span><span class="g-score">${sc?`${sc[0]}–${sc[1]}`:'–'}</span></div>`; return; }
+    out+=`<div class="game edit">${court}<div class="g-edit">${[0,1].map(t=>`<div class="g-row">${team(t)}<span class="sc">${[0,1,2,3].map(v=>`<button class="sv sm${g.score&&g.score[t]===v?' on':''}" data-hscore="${gi}:${t}:${v}" aria-pressed="${!!(g.score&&g.score[t]===v)}">${v}</button>`).join('')}</span></div>`).join('')}</div></div>`;
+  });
+  return out+'</div>';
+}
+function historyView(){
+  const h=history().nights.reverse();
+  if(!h.length) return `<h2>History</h2><div class="banner">No nights saved yet. End a night from the Tonight tab and it lands here.</div>`;
+  return `<h2>History</h2>` + h.map(({nt,st})=>{
+    const r=rank(st), editing=false, open=false, tools='';
+    return `<details class="night"${open||sumOpen===nt.date?' open':''}><summary><b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b><span class="muted">${nt.venue&&VENUES[nt.venue]?esc(VENUES[nt.venue].name)+' · ':''}${nt.players.length} players · ${nt.rounds} rounds${r[0]?` · Top: ${esc(r[0].name)}`:''}</span></summary>
+    ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}`}${tools}${gameLog(nt, editing)}</details>`;
+  }).join('');
+}
+function editTools(key, editing){
+  const isNight = key!=='tonight';
+  if(editing) return `<div class="edit-bar"><span class="muted">Editing scores. Each game needs one team on 3.</span><div class="row"><button class="btn primary sm" id="hsave">Save changes</button><button class="btn sm" id="hcancel">Cancel</button>${isNight?(confirming==='delnight'?`<button class="btn sm danger" id="hdelyes">Delete this night for good</button>`:`<button class="btn sm danger" id="hdel">Delete night</button>`):''}</div>${confirming==='delnight'&&isNight?'<p class="err-text">This removes the night and all its games from the history and seeding. It can’t be undone.</p>':''}${editErr?`<p class="err-text">${esc(editErr)}</p>`:''}</div>`;
+  if(lockPrompt===key) return `<form class="edit-bar" id="pwform"><label for="pw">Password to edit</label><div class="row"><input id="pw" type="password" autocomplete="off"><button class="btn primary sm" type="submit">Unlock</button><button class="btn sm" type="button" id="pwcancel">Cancel</button></div>${pwErr?`<p class="err-text">${esc(pwErr)}</p>`:''}</form>`;
+  return `<div class="edit-bar"><button class="btn sm" data-hedit="${esc(key)}">${isNight?'Edit night':'Edit scores'}</button></div>`;
+}
+function startEdit(key){
+  const src = key==='tonight' ? night.log : (nights.find(n=>n.date===key)||{}).games;
+  if(!src) return; editNight=key; lockPrompt=null; editErr=''; confirming=null; draft=JSON.parse(JSON.stringify(src)); render();
+}
+async function deleteNight(){
+  const i=nights.findIndex(n=>n.date===editNight); if(i<0) return; const nt=nights[i];
+  if(db && nt._id){ try{ await db.doc('nights/'+nt._id).delete(); }catch(e){ editErr='Couldn’t delete. Check your connection and try again.'; render(); return; } }
+  nights=nights.filter(n=>n.date!==nt.date); if(!db) lsSave(); logChange(`Deleted the night of ${nightLabel(nt)}`);
+  editNight=null; draft=null; confirming=null; setStatus('Night deleted'); render();
+}
+async function saveEdit(){
+  if(draft.some(g=>g.pairs && g.winner==null)){ editErr='Some games don’t have a winner yet. Give one team 3.'; render(); return; }
+  if(editNight==='tonight'){ night.log=draft; saveNight(); editNight=null; draft=null; setStatus('Scores updated'); render(); return; }
+  const nt=nights.find(n=>n.date===editNight); if(!nt) return;
+  const rec={...nt, games:draft}; delete rec._id;
+  if(db && nt._id){ try{ await db.doc('nights/'+nt._id).set(rec); }catch(e){ editErr='Couldn’t save. Check your connection and try again.'; render(); return; } }
+  else { Object.assign(nt, rec); lsSave(); }
+  Object.assign(nt, {games:draft}); logChange(`Edited scores for ${nightLabel(nt)}`); editNight=null; draft=null; setStatus('Scores updated'); render();
+}
+
+/* ---------- events ---------- */
+$('#acct').addEventListener('click', ()=>{ if(tab!=='acct') backTab=tab; tab='acct'; authMsg=null; authMode='signin'; render(); window.scrollTo(0,0); });
+document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){ tab=b.dataset.tab; confirming=null; editNames=false; renaming=null; render(); } });
+$('#main').addEventListener('submit', async e=>{
+  e.preventDefault();
+  if(e.target.id==='newpform'){ const v=$('#newp').value.trim().replace(/\s+/g,' '); if(!v) return;
+    const known=knownNames().find(n=>n.toLowerCase()===v.toLowerCase()), name=known||v;
+    if(!roster.includes(name)){ roster.push(name); saveRoster(); addNote=`${name} added. Tap their name above to put them in tonight’s list.`; }
+    else addNote=`${name} is already in the list above.`;
+    justAdded=name; render(); const i=$('#newp'); if(i) i.focus(); return; }
+  if(e.target.id==='authform'){ const em=$('#auth-email').value.trim().toLowerCase(), pw=$('#auth-pw')?$('#auth-pw').value:''; authBusy=true; authMsg=null; render();
+    try{
+      if(authMode==='signup'){ await authApi.signUp(em,pw); authMsg={t:`Account created. We sent a confirmation link to ${em}.`}; }
+      else if(authMode==='reset'){ await authApi.reset(em); authMsg={t:`If ${em} has an account, a reset link is on its way.`}; authMode='signin'; }
+      else { await authApi.signIn(em,pw); authMsg=null; tab = backTab==='acct' ? 'seed' : (backTab==='lm'||backTab==='night'?backTab:'night'); }
+    }catch(err){ authMsg={t:AUTH_ERR[err.code]||'Something went wrong. Try again.',err:true}; }
+    authBusy=false; render(); return; }
+  if(e.target.id==='refaddform'){ const em=$('#ref-email').value.trim().toLowerCase();
+    if(!/^\S+@\S+\.\S+$/.test(em)) lmMsg.refs={t:'Enter a valid email address.',err:true};
+    else if(refsList.includes(em)||em===LM_EMAIL) lmMsg.refs={t:'That email is already set up.',err:true};
+    else { refsList=[...refsList, em]; saveRefs(); logChange(`Added ${em} as a ref`); lmMsg.refs={t:`${em} can now sign up and run nights.`}; }
+    render(); return; }
+  if(e.target.id==='refform'){ const v=$('#refpw').value; let ok=false; try{ ok=(await sha256(v))===REF_HASH; }catch(err){}
+    if(ok){ setRef(true); refErr=''; tab='night'; render(); } else { refErr='That password isn’t right.'; render(); const i=$('#refpw'); if(i) i.focus(); } return; }
+  if(e.target.id==='pwchange'){ const c=$('#pw-cur').value, n1=$('#pw-new').value, n2=$('#pw-new2').value; let ok=false; try{ ok=(await sha256(c))===activeHash(); }catch(err){}
+    if(!ok) lmMsg.pw={t:'The current password isn’t right.',err:true};
+    else if(n1.length<4) lmMsg.pw={t:'Use at least 4 characters.',err:true};
+    else if(n1!==n2) lmMsg.pw={t:'The new passwords don’t match.',err:true};
+    else { settings.lmHash=await sha256(n1); saveSettings(); logChange('Changed the LM password'); lmMsg.pw={t:'Password changed. Use the new one from now on.'}; }
+    render(); return; }
+  if(e.target.id==='lmform'){ const v=$('#lmpw').value; let ok=false; try{ ok=(await sha256(v))===activeHash(); }catch(err){}
+    if(ok){ unlocked=true; lmErr=''; render(); } else { lmErr='That password isn’t right.'; render(); const i=$('#lmpw'); if(i) i.focus(); } return; }
+  if(e.target.id==='renameform'){ const v=$('#rename-in').value.trim().replace(/\s+/g,' ');
+    if(!v){ renameErr='Type a name.'; render(); return; }
+    if(v===renaming){ renaming=null; render(); return; }
+    const exists = seeding().some(r=>r.name===v) && confirming!=='merge:'+v;
+    if(exists){ confirming='merge:'+v; renameErr=`${v} already exists. Save again to merge them into one player.`; render(); const i=$('#rename-in'); if(i){ i.value=v; i.focus(); } return; }
+    confirming=null; await renamePlayer(renaming, v); return; }
+  if(e.target.id==='pwform'){ const v=$('#pw').value; let ok=false; try{ ok=(await sha256(v))===activeHash(); }catch(err){}
+    if(ok){ unlocked=true; if(lockPrompt==='round'){ lockPrompt=null; startRoundEdit(); } else startEdit(lockPrompt); } else { pwErr='That password isn’t right.'; render(); const i=$('#pw'); if(i) i.focus(); } return; }
+  if(e.target.id==='lateform'){ const v=$('#latep').value.trim(); if(!v) return;
+    if(!roster.includes(v)){ roster.push(v); saveRoster(); }
+    const inPlay = night.courts.some(c=>[...c.a,...c.b].includes(v)) || night.bench.includes(v);
+    if(!inPlay){ night.bench.push(v); night.left=night.left.filter(x=>x!==v); if(!night.arrivals.includes(v)) night.arrivals.push(v); saveNight(); }
+    render(); }
+});
+$('#main').addEventListener('change', e=>{
+  const T=e.target, D=T.dataset;
+  if(T.id==='merge-a'||T.id==='merge-b'){ mergeSel[T.id==='merge-a'?0:1]=T.value; confirming=null; lmMsg.merge=null; return; }
+  if(manual){
+    if(T.id==='m-date'){ manual.date=T.value; return; }
+    if(T.id==='m-venue'){ manual.venue=T.value; return; }
+    if(T.id==='m-courts'){ manual.courts=+T.value; manual.games.forEach(g=>{ if(g.court>=manual.courts) g.court=manual.courts-1; }); render(); return; }
+    if(D.mround!=null){ manual.games[+D.mround].round=Math.max(1,+T.value||1); return; }
+    if(D.mcourt!=null){ manual.games[+D.mcourt].court=+T.value; return; }
+    if(D.mn!=null){ const [gi,k]=D.mn.split(':').map(Number); manual.games[gi].p[k]=T.value.trim(); return; }
+  }
+  const i=e.target.dataset.name; if(i==null) return;
+  { const typed=e.target.value.trim().replace(/\s+/g,' '), match=typed&&knownNames().find(n=>n.toLowerCase()===typed.toLowerCase()), name=match||typed;
+    night.setup.names[+i]=name; saveNight();
+    if(name && !roster.includes(name)){ roster.push(name); saveRoster(); } }
+  const f=document.activeElement&&document.activeElement.id; render(); if(f&&$('#'+f)) $('#'+f).focus();
+});
+$('#main').addEventListener('keydown', e=>{
+  if(e.key!=='Enter'||e.target.dataset.name==null) return; e.preventDefault();
+  const nx=$('#name-'+(+e.target.dataset.name+1)); nx ? nx.focus() : e.target.blur();
+});
+$('#main').addEventListener('click', async e=>{
+  const t=e.target.closest('button'); if(!t) return; const d=t.dataset;
+  if(d.hedit!=null){ if(unlocked) startEdit(d.hedit); }
+  else if(t.id==='pwcancel' && lockPrompt==='round'){ lockPrompt=null; render(); }
+  else if(t.id==='pwcancel'){ lockPrompt=null; render(); }
+  else if(t.id==='hcancel'){ editNight=null; draft=null; confirming=null; editErr=''; render(); }
+  else if(t.id==='hsave') saveEdit();
+  else if(t.id==='reset'){ confirming='reset'; render(); }
+  else if(t.id==='reset-yes'){ const su=night.setup; night=blankNight(su.courts, su.subs); night.setup.venue=su.venue; night.setup.names=[...(su.names||[])]; confirming=null; saveNight(); render(); window.scrollTo(0,0); }
+  else if(t.id==='hdel'){ confirming='delnight'; render(); }
+  else if(t.id==='hdelyes') deleteNight();
+  else if(d.hscore){ const [gi,tm,v]=d.hscore.split(':').map(Number); setScore(draft[gi],tm,v); editErr=''; render(); }
+  else if(d.clear!=null){ night.setup.names[+d.clear]=''; saveNight(); render(); }
+  else if(d.seedsel!=null){ copied=null; copyFallback=null; seedSel=d.seedsel; render(); const b=document.querySelector('.seg.on'); if(b){ b.focus(); b.scrollIntoView({inline:'nearest',block:'nearest'}); } }
+  else if(d.venue){ night.setup.venue=d.venue; saveNight(); render(); }
+  else if(d.step){ const s=night.setup, v=+d.d;
+    if(d.step==='courts') s.courts=Math.max(1,Math.min(MAXC,s.courts+v)); else s.subs=Math.max(0,Math.min(MAXS,s.subs+v));
+    saveNight(); render(); }
+  else if(d.pick!=null){ const p=d.pick, names=setupNames(), at=names.indexOf(p);
+    if(at>=0) night.setup.names[at]=''; else { const free=names.findIndex(n=>!n); if(free<0) return; night.setup.names[free]=p; }
+    saveNight(); render(); }
+  else if(t.id==='clear'){ night.setup.names=[]; saveNight(); render(); }
+  else if(t.id==='start') startNight();
+  else if(t.id==='draw') openFlip();
+  else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
+  else if(t.id==='next-yes') nextRound();
+  else if(t.id==='lmlock'){ if(authApi) authApi.signOut(); renaming=null; confirming=null; editNight=null; draft=null; tab='seed'; render(); }
+  else if(d.amode){ authMode=d.amode; authMsg=null; render(); const i=$('#auth-email'); if(i) i.focus(); }
+  else if(t.id==='auth-out'){ authApi.signOut(); authMsg=null; tab='seed'; render(); }
+  else if(t.id==='auth-resend'){ try{ await authApi.resend(); authMsg={t:'Sent. Check your inbox (and junk folder).'}; }catch(err){ authMsg={t:AUTH_ERR[err.code]||'Couldn’t send it. Try again in a minute.',err:true}; } render(); }
+  else if(t.id==='auth-check'){ const u=await authApi.refresh(); me=u; authMsg = u&&u.verified ? null : {t:'Not confirmed yet. Tap the link in the email first.',err:true}; applyRoles(); render(); }
+  else if(t.id==='pw-reset'){ try{ await authApi.reset(me.email); lmMsg.pw={t:`Reset link sent to ${me.email}.`}; }catch(err){ lmMsg.pw={t:'Couldn’t send it. Try again in a minute.',err:true}; } render(); }
+  else if(d.refdel!=null){ refsList=refsList.filter(x=>x!==d.refdel); saveRefs(); logChange(`Removed ${d.refdel} as a ref`); render(); }
+  else if(t.id==='restore-no'){ restorePlan=null; render(); }
+  else if(t.id==='restore-go') runRestore();
+  else if(d.active!=null){ const p=d.active, on=isInactive(p); settings.inactive = on ? (settings.inactive||[]).filter(x=>x!==p) : [...(settings.inactive||[]), p]; saveSettings(); logChange(`${on?'Reactivated':'Made inactive'}: ${p}`); render(); }
+  else if(t.id==='merge-go'){ const [a,b]=mergeSel; if(!a||!b){ lmMsg.merge={t:'Choose both players.',err:true}; } else if(a===b){ lmMsg.merge={t:'Choose two different players.',err:true}; } else { confirming='merge-go'; lmMsg.merge=null; } render(); }
+  else if(t.id==='merge-yes'){ const [a,b]=mergeSel; confirming=null; await renamePlayer(a,b,`Merged ${a} into ${b}`); mergeSel=['','']; lmMsg.merge={t:`Merged ${a} into ${b}.`}; render(); }
+  else if(t.id==='bulk-go'){ const lines=($('#bulk-in').value||'').split(/\n|,/).map(x=>x.trim().replace(/\s+/g,' ')).filter(Boolean); const added=[], skipped=[];
+    lines.forEach(n=>{ if(knownNames().some(k=>k.toLowerCase()===n.toLowerCase())||added.some(k=>k.toLowerCase()===n.toLowerCase())) skipped.push(n); else added.push(n); });
+    if(added.length){ roster.push(...added); saveRoster(); logChange(`Added ${added.length} player${added.length>1?'s':''}: ${added.join(', ')}`); }
+    lmMsg.bulk = lines.length ? {t:`Added ${added.length}.${skipped.length?` Already on the list: ${skipped.join(', ')}.`:''}`} : {t:'Type at least one name.',err:true}; render(); }
+  else if(t.id==='rate-go'){ const p=$('#rate-p').value, v=Math.round(+$('#rate-v').value);
+    if(!p){ lmMsg.rate={t:'Choose a player.',err:true}; } else if(!(v>=600&&v<=1600)){ lmMsg.rate={t:'Use a rating between 600 and 1600.',err:true}; }
+    else { settings.ratings={...(settings.ratings||{}), [p]:v}; saveSettings(); logChange(`Set ${p}’s starting rating to ${v}`); lmMsg.rate={t:`${p} now starts at ${v}.`}; } render(); }
+  else if(t.id==='adj-go'){ const p=$('#adj-p').value, v=Math.round(+$('#adj-v').value), why=$('#adj-r').value.trim();
+    if(!p) lmMsg.adj={t:'Choose a player.',err:true}; else if(!v || Math.abs(v)>500) lmMsg.adj={t:'Enter a number of points, like 5 or -5.',err:true};
+    else { settings.adjust=[...(settings.adjust||[]), {name:p, pts:v, reason:why, at:new Date().toISOString()}]; saveSettings(); logChange(`${v>0?'Added':'Removed'} ${Math.abs(v)} point${Math.abs(v)>1?'s':''} ${v>0?'to':'from'} ${p}${why?` (${why})`:''}`); lmMsg.adj={t:`${p} ${v>0?'+':''}${v} points.`}; }
+    render(); }
+  else if(d.adjdel!=null){ const a=(settings.adjust||[])[+d.adjdel]; if(a){ settings.adjust=settings.adjust.filter((_,i)=>i!==+d.adjdel); saveSettings(); logChange(`Undid ${a.pts>0?'+':''}${a.pts} points for ${a.name}`); lmMsg.adj={t:`Undone: ${a.name} ${a.pts>0?'+':''}${a.pts}.`}; render(); } }
+  else if(d.rateclear!=null){ const r={...(settings.ratings||{})}; delete r[d.rateclear]; settings.ratings=r; saveSettings(); logChange(`Reset ${d.rateclear}’s starting rating to 1000`); render(); }
+  else if(d.mscore){ const [gi,tm2,v]=d.mscore.split(':').map(Number); const sc=manual.games[gi].score; sc[tm2]=sc[tm2]===v?null:v; if(v===3&&sc[1-tm2]===3) sc[1-tm2]=null; render(); }
+  else if(t.id==='m-add'){ const last=manual.games[manual.games.length-1]||{round:1,court:-1}; const nc=last.court+1<manual.courts?last.court+1:0; manual.games.push({round:nc===0&&manual.games.length?last.round+1:last.round, court:Math.max(0,nc), p:['','','',''], score:[null,null]}); render(); const ins=document.querySelectorAll('[data-mn]'); if(ins.length) ins[ins.length-4].focus(); }
+  else if(d.mdel!=null){ manual.games.splice(+d.mdel,1); render(); }
+  else if(t.id==='m-clear'){ manual=blankManual(); lmMsg.manual=null; render(); }
+  else if(t.id==='m-save') saveManual();
+  else if(t.id==='rules-save'){ const r={}; let bad=false; document.querySelectorAll('[data-rule]').forEach(i=>{ const v=Math.round(+i.value); if(!(v>=+i.min&&v<=+i.max)) bad=true; r[i.dataset.rule]=v; });
+    if(bad){ lmMsg.rules={t:'One of the numbers is out of range.',err:true}; } else if(r.halfWeeks<r.fullWeeks){ lmMsg.rules={t:'“Weeks that count half” must be at least the full weeks.',err:true}; }
+    else { settings.rules=r; saveSettings(); logChange('Changed the seeding settings'); lmMsg.rules={t:'Settings saved.'}; } render(); }
+  else if(t.id==='rules-reset'){ delete settings.rules; saveSettings(); logChange('Reset the seeding settings to defaults'); lmMsg.rules={t:'Back to the default settings.'}; render(); }
+  else if(t.id==='season-rename'){ const v=$('#season-name').value.trim(); if(!v) return; const cur={...currentSeason(), name:v}; delete cur.end; settings.seasons={...(settings.seasons||{}), current:cur}; saveSettings(); logChange(`Renamed the current season to ${v}`); lmMsg.season={t:'Season renamed.'}; render(); }
+  else if(t.id==='season-start'){ if(!$('#season-new').value.trim()){ lmMsg.season={t:'Give the new season a name.',err:true}; render(); return; } pendingSeason=$('#season-new').value.trim(); confirming='season'; render(); }
+  else if(t.id==='season-yes'){ const now=new Date().toISOString(), cur=currentSeason(), first=nights.map(n=>n.date).sort()[0]||now;
+    settings.seasons={current:{name:pendingSeason, start:now}, past:[...pastSeasons(), {name:cur.name, start:cur.start||first, end:now}]}; saveSettings(); logChange(`Started a new season: ${pendingSeason}`); confirming=null; lmMsg.season={t:`${pendingSeason} has started. ${cur.name} is saved under Seeding.`}; render(); }
+  else if(t.id==='dl-csv') download('csv');
+  else if(t.id==='dl-json') download('json');
+  else if(t.id==='log-more'){ showAllLog=!showAllLog; render(); }
+  else if(t.id==='rm-no'){ confirming=null; render(); }
+  else if(d.vround!=null){ viewRound = d.vround==='live' ? null : +d.vround; rDraft=null; rErr=''; confirming=null; lockPrompt=null; render(); window.scrollTo(0,0); }
+  else if(t.id==='redit'){ if(ref) startRoundEdit(); }
+  else if(t.id==='rcancel'){ rDraft=null; rErr=''; confirming=null; render(); }
+  else if(d.rscore){ const [gi,tm2,v]=d.rscore.split(':').map(Number); setScore(rDraft[gi],tm2,v); rErr=''; render(); }
+  else if(t.id==='rsave'){ if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; render(); } else if(flipsIn(rDraft).length){ confirming='flip'; render(); window.scrollTo(0,0); } else saveRound(false); }
+  else if(t.id==='rsave-keep') saveRound(false);
+  else if(t.id==='rsave-redo') saveRound(true);
+  else if(t.id==='rflip-back'){ confirming=null; render(); }
+  else if(d.slam){ const [tm,v]=d.slam.split(':').map(Number); const st=slamState(night); if(st){ const sc=night.slam.score; sc[tm]=sc[tm]===v?null:v; if(v===2&&sc[1-tm]===2) sc[1-tm]=null; saveNight(); render(); } }
+  else if(t.id==='next-no'){ confirming=null; render(); }
+  else if(t.id==='undo'){ confirming='undo'; render(); }
+  else if(t.id==='undo-yes') undoRound();
+  else if(d.player!=null){ sheet={p:d.player, step:'menu'}; render(); const f=$('#sheet-left'); if(f) f.focus(); }
+  else if(t.id==='sheet-close'){ sheet=null; render(); }
+  else if(t.id==='sheet-left'){ sheet.step='replace'; render(); const f=document.querySelector('.rep, #sheet-bench-yes'); if(f) f.focus(); }
+  else if(t.id==='sheet-bench-yes') leaveWithUndo(sheet.p, null);
+  else if(d.rep!=null){ const o=sheetOpts[+d.rep]; if(o) leaveWithUndo(sheet.p, o.type==='auto'?null:o); }
+  else if(t.id==='leave-undo'){ const u=(night.leaveUndo||[]).slice(-1)[0]; if(!u) return; if(stateKey(night)===u.after) undoLeave(); else { confirming='leaveundo'; render(); } }
+  else if(t.id==='leave-undo-yes') undoLeave();
+  else if(d.sum!=null){ sumOpen = sumOpen===d.sum ? null : d.sum; copied=null; copyFallback=null; render(); }
+  else if(t.id==='sum-dismiss'){ justEnded=null; copied=null; copyFallback=null; render(); }
+  else if(d.copy!=null){ const txt=summaryText(d.copy), key=d.copy;
+    const fallback=()=>{ copyFallback=key; render(); const b=$('#copybox'); if(b){ b.focus(); b.select(); } };
+    try{ navigator.clipboard.writeText(txt).then(()=>{ copied=key; copyFallback=null; render(); }, fallback); }catch(err){ fallback(); } }
+  else if(t.id==='addcourt') addCourtFromSubs();
+  else if(d.opt){ const [ci,k]=d.opt.split(':').map(Number), c=night.courts[ci]; c.pairs=allOptions(c)[k]; c.face='picked'; saveNight(); render(); }
+  else if(d.redraw!=null){ const c=night.courts[+d.redraw]; c.pairs=null; c.face=null; c.score=null; c.winner=null; saveNight(); render(); }
+  else if(d.score){ const [ci,tm,v]=d.score.split(':').map(Number); setScore(night.courts[ci],tm,v); saveNight(); render(); }
+  else if(t.id==='end'){ confirming='end'; render(); }
+  else if(t.id==='end-no'){ confirming=null; render(); }
+  else if(t.id==='end-yes') endNight();
+  else if(d.rm!=null){ confirming='rm:'+d.rm; render(); }
+  else if(d.ren!=null){ renaming=d.ren; renameErr=''; confirming=null; render(); const i=$('#rename-in'); if(i){ i.focus(); i.select(); } }
+  else if(t.id==='rename-no'){ renaming=null; renameErr=''; confirming=null; render(); }
+  else if(d.go){ if(d.go==='acct') backTab=tab; tab=d.go; confirming=null; authMsg=null; render(); window.scrollTo(0,0); }
+  else if(t.id==='reflock'){ editNames=false; render(); }
+  else if(t.id==='editnames'){ editNames=!editNames; renaming=null; renameErr=''; confirming=null; render(); }
+  else if(d.rmyes!=null){ roster=roster.filter(p=>p!==d.rmyes); confirming=null; saveRoster(); logChange(`Removed ${d.rmyes} from the player list`); render(); }
+});
+
+/* ---------- name suggestions while typing ---------- */
+let sugBox=null, addNote='', justAdded=null;
+function knownNames(){ return [...new Set([...roster, ...nights.flatMap(n=>n.players||[])])]; }
+function matchNames(q, exclude){
+  q=q.trim().toLowerCase(); if(!q) return [];
+  const score = n => { const l=n.toLowerCase(); if(l===q) return -1; if(l.startsWith(q)) return 0; if(l.split(/[\s.\-]+/).some(w=>w.startsWith(q))) return 1; if(l.includes(q)) return 2;
+    const ql=q.replace(/[^a-z]/g,''), nl=l.replace(/[^a-z]/g,''); return ql.length>1 && nl.startsWith(ql) ? 3 : 9; };
+  return knownNames().filter(n=>!exclude.includes(n)&&!isInactive(n)).map(n=>[score(n),n]).filter(([s])=>s<9 && s>=0).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])).slice(0,6).map(x=>x[1]);
+}
+function hideSug(){ if(sugBox){ const h=sugBox.parentElement; sugBox.remove(); sugBox=null; if(h) h.classList.remove('sug-host'); } }
+function showSug(input){
+  hideSug();
+  const used = input.dataset.name!=null ? setupNames().filter((n,i)=>i!==+input.dataset.name) : input.id==='newp' ? setupNames() : [];
+  const list = matchNames(input.value, used); if(!list.length) return;
+  sugBox=document.createElement('div'); sugBox.className='suggest'; sugBox.setAttribute('role','listbox');
+  sugBox.innerHTML=list.map(n=>`<button type="button" role="option" data-sug="${esc(n)}">${esc(n)}</button>`).join('');
+  const host=input.parentElement; host.classList.add('sug-host'); host.appendChild(sugBox);
+  sugBox.addEventListener('pointerdown', e=>{ const b=e.target.closest('[data-sug]'); if(!b) return; e.preventDefault(); pickSug(input, b.dataset.sug); });
+  sugBox.addEventListener('click', e=>{ const b=e.target.closest('[data-sug]'); if(b) pickSug(input, b.dataset.sug); });
+}
+function pickSug(input, name){
+  if(!sugBox) return; hideSug();
+  if(input.dataset.name!=null){ const i=+input.dataset.name; night.setup.names[i]=name; saveNight(); render();
+    const nx=setupNames().findIndex(n=>!n); const f=nx>=0?$('#name-'+nx):null; if(f) f.focus(); }
+  else if(input.id==='newp'){ input.value=name; input.form.requestSubmit(); }
+  else { input.value=name; input.dispatchEvent(new Event('change',{bubbles:true})); input.focus(); }
+}
+$('#main').addEventListener('input', e=>{ const t=e.target; if(t.dataset.name!=null || t.dataset.mn!=null || t.id==='newp' || t.id==='latep') showSug(t); });
+// LM sections remember which are open across re-renders
+$('#main').addEventListener('click', e=>{ const sm=e.target.closest('details[data-lm] > summary'); if(sm){ const dt=sm.parentElement, k=dt.dataset.lm; setTimeout(()=>{ dt.open?lmOpen.add(k):lmOpen.delete(k); },0); } });
+$('#main').addEventListener('focusout', e=>{ if(sugBox && !(e.relatedTarget && sugBox.contains(e.relatedTarget))) setTimeout(hideSug,120); });
+$('#main').addEventListener('keydown', e=>{ if(e.key==='Escape') hideSug(); });
+
+$('#main').addEventListener('click', e=>{ if(e.target.id==='sheet-wrap'){ sheet=null; render(); } });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet){ sheet=null; render(); } });
+
+/* ---------- the flip ---------- */
+let flipQ=[], flipI=0, spin=0, busy=false;
+function openFlip(){ refreshSeeds(); flipQ = night.courts.map((c,i)=>i).filter(i=>!night.courts[i].pairs); if(!flipQ.length) return; flipI=0; $('#flip').hidden=false; document.body.style.overflow='hidden'; showFlip(); }
+function closeFlip(){ $('#flip').hidden=true; document.body.style.overflow=''; saveNight(); render(); }
+function showFlip(){
+  const i=flipQ[flipI], c=night.courts[i], n=night.courts.length;
+  $('#flip-eyebrow').textContent=`Round ${night.round} · draw ${flipI+1} of ${flipQ.length}`;
+  $('#flip-court').innerHTML=`${courtName(i,n)}${courtTag(i,n)?`<small>${courtTag(i,n)}</small>`:''}`;
+  $('#side-a-label').textContent=c.aLab; $('#side-a').innerHTML=c.a.map(nm).join('<br>');
+  $('#side-b-label').textContent=c.bLab; $('#side-b').innerHTML=c.b.map(nm).join('<br>');
+  const fmt = pp => pp.map(p=>p.map(nm).join(' &amp; ')).join(' vs ');
+  $('#flip-options').innerHTML=`<div><span>Gulag face up</span>${fmt(optionPairs(c,'up'))}</div><div><span>Blank face up</span>${fmt(optionPairs(c,'down'))}</div>`;
+  $('#flip-result').hidden=true; $('#racket-btn').disabled=false; $('#racket-hint').textContent='Tap to flip';
+}
+function land(face){
+  const c=night.courts[flipQ[flipI]];
+  c.face=face; c.pairs=optionPairs(c,face); c.score=null; c.winner=null;
+  $('#landed').textContent = face==='up' ? 'Gulag face up' : 'Blank face up';
+  $('#fp0').innerHTML=c.pairs[0].map(nm).join('<br>'); $('#fp1').innerHTML=c.pairs[1].map(nm).join('<br>');
+  $('#flip-next').textContent = flipI===flipQ.length-1 ? 'Start playing' : 'Next court';
+  $('#flip-result').hidden=false; $('#racket-hint').textContent=''; busy=false; saveNight();
+}
+$('#racket-btn').addEventListener('click', ()=>{
+  if(busy) return; busy=true; $('#racket-btn').disabled=true;
+  const face = Math.random()<.5 ? 'up' : 'down', r=$('#racket'), toss=$('#toss');
+  spin = Math.ceil(spin/360)*360 + 1440 + (face==='down'?180:0);
+  r.classList.add('spinning'); r.style.transform=`rotateY(${spin}deg)`;
+  toss.classList.remove('tossing'); void toss.offsetWidth; toss.classList.add('tossing');
+  setTimeout(()=>land(face), matchMedia('(prefers-reduced-motion: reduce)').matches ? 350 : 1750);
+});
+$('#flip-next').addEventListener('click', ()=>{ flipI++; flipI<flipQ.length ? showFlip() : closeFlip(); });
+$('#flip-skip').addEventListener('click', ()=>{
+  night.courts.forEach(c=>{ if(!c.pairs){ const f=Math.random()<.5?'up':'down'; c.face=f; c.pairs=optionPairs(c,f); c.score=null; c.winner=null; } });
+  busy=false; closeFlip();
+});
+
+/* ---------- boot ---------- */
+const typing = () => { const a=document.activeElement; return a && a.tagName==='INPUT' && $('#main').contains(a); };
+lsLoad(); render();
+(async()=>{
+  const be = await new Promise(res=>{ if(window.gpBackend!==undefined) return res(window.gpBackend); window.addEventListener('gp-backend',()=>res(window.gpBackend),{once:true}); setTimeout(()=>res(window.gpBackend||null),15000); });
+  if(!be){ setStatus('Offline: changes are saved on this phone only', true); return; }
+  db = be.db; authApi = be.auth;
+  let stopRefs=null;
+  authApi.onChange(u=>{ me=u; if(stopRefs){ stopRefs(); stopRefs=null; } refsList=[];
+    if(u && u.verified && db.raw) stopRefs = db.raw('club/access').onSnapshot(s=>{ refsList = s.exists ? (s.data().refs||[]) : []; applyRoles(); if(!typing()) render(); }, ()=>{});
+    applyRoles(); if(!typing()) render(); });
+  setStatus('Live');
+  const lost = ()=>setStatus('Lost connection. Reload the page', true);
+  db.doc('club/settings').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/settings')) return; settings = s.exists ? JSON.parse(JSON.stringify(s.data())) : {}; if(!typing()) render(); }, ()=>{});
+  db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
+  db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
+  db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
+  db.collection('nights').onSnapshot(q=>{ nights = q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */ if(!typing()) render(); }, ()=>{});
+})();
+</script>
+
+
+<script type="module">
+// Firebase: database (Firestore) + logins (Auth). A test page can pre-set window.gpBackend to skip this.
+if (window.gpBackend === undefined) {
+  const V = '13.1.0', base = `https://www.gstatic.com/firebasejs/${V}/`;
+  try {
+    const [{ initializeApp }, F, A] = await Promise.all([import(base+'firebase-app.js'), import(base+'firebase-firestore.js'), import(base+'firebase-auth.js')]);
+    const app = initializeApp({
+      apiKey: "AIzaSyDUArMZBUJ_GSi2b-FfI4uMgWj_TG2jRlI",
+      authDomain: "gulag-padel.firebaseapp.com",
+      projectId: "gulag-padel",
+      storageBucket: "gulag-padel.firebasestorage.app",
+      messagingSenderId: "186179686734",
+      appId: "1:186179686734:web:2270ab70b1a609b3288e1f"
+    });
+    let fs;
+    try { fs = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+    catch (e) { fs = F.getFirestore(app); }
+    // Documents are stored as one JSON string, because Firestore can't hold lists inside lists (courts and pairs need them).
+    const wrap = s => ({ exists: s.exists(), data: () => s.exists() ? JSON.parse(s.data().json || '{}') : undefined, metadata: { hasPendingWrites: s.metadata.hasPendingWrites } });
+    const body = b => ({ json: JSON.stringify(b), at: F.serverTimestamp() });
+    const db = {
+      doc: path => { const r = F.doc(fs, path); return {
+        set: b => F.setDoc(r, body(b)),
+        delete: () => F.deleteDoc(r),
+        onSnapshot: (next, err) => F.onSnapshot(r, s => next(wrap(s)), err) }; },
+      collection: path => { const c = F.collection(fs, path); return {
+        add: b => F.addDoc(c, body(b)),
+        onSnapshot: (next, err) => F.onSnapshot(c, q => next({ docs: q.docs.map(d => ({ id: d.id, data: () => JSON.parse(d.data().json || '{}') })) }), err) }; },
+      // plain document (the ref list), readable by the security rules
+      raw: path => { const r = F.doc(fs, path); return {
+        set: b => F.setDoc(r, b),
+        onSnapshot: (next, err) => F.onSnapshot(r, s => next({ exists: s.exists(), data: () => s.data() }), err) }; }
+    };
+    const auth = A.getAuth(app);
+    const user = u => u ? { email: (u.email || '').toLowerCase(), verified: !!u.emailVerified } : null;
+    window.gpBackend = { db, auth: {
+      onChange: cb => A.onIdTokenChanged(auth, u => cb(user(u))), // also fires after the email is confirmed and the token refreshed
+      signIn: (e, p) => A.signInWithEmailAndPassword(auth, e, p),
+      signUp: async (e, p) => { const c = await A.createUserWithEmailAndPassword(auth, e, p); await A.sendEmailVerification(c.user); },
+      signOut: () => A.signOut(auth),
+      reset: e => A.sendPasswordResetEmail(auth, e),
+      resend: () => auth.currentUser ? A.sendEmailVerification(auth.currentUser) : Promise.resolve(),
+      refresh: async () => { if (!auth.currentUser) return null; await auth.currentUser.reload(); await auth.currentUser.getIdToken(true); return user(auth.currentUser); }
+    } };
+  } catch (e) { console.error('Firebase did not load', e); window.gpBackend = null; }
+  window.dispatchEvent(new Event('gp-backend'));
+}
+</script>
+</body>
+</html>
