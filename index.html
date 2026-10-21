@@ -1001,7 +1001,8 @@ async function runRestore(){
     logChange(`Imported a backup: ${P.nights.length} night${P.nights.length===1?'':'s'}, ${P.newPlayers.length} new player${P.newPlayers.length===1?'':'s'}`);
     if(!db) lsSave();
     lmMsg.restore={t:`Imported ${P.nights.length} night${P.nights.length===1?'':'s'} and ${P.newPlayers.length} new player${P.newPlayers.length===1?'':'s'}.`};
-  }catch(err){ lmMsg.restore={t:'The import stopped partway. Check your connection and run it again: nights already imported are skipped.',err:true}; }
+  }catch(err){ const c=err&&err.code||''; console.error('restore failed', err);
+    lmMsg.restore={t: c==='permission-denied' ? 'Firebase refused to save. Make sure the security rules from Step 1 are published (Firestore Database → Rules → Publish) and the button at the top says LM, then run it again.' : `The import stopped partway${c?` (${c})`:''}. Check your connection and run it again: nights already imported are skipped.`, err:true}; }
   render();
 }
 function csvCell(v){ v=String(v??''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
