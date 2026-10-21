@@ -773,7 +773,7 @@ const nm = p => esc(p)+(liveTop[p]?`<span class="liveno" title="Tonight’s live
 const REF_HASH='239b052ff6654980bb7ac3c9e589564708f6428a850ffbf40b1e336ab6f85066';
 // Roles come from logins: the league manager's email is fixed; refs are emails the LM adds in LM Tools.
 const LM_EMAIL='ragy_labib@hotmail.com';
-let ref=false, refErr='', me=null, refsList=[], authApi=null, authMode='signin', authMsg=null, authBusy=false, backTab='seed';
+let diagMsg='', ref=false, refErr='', me=null, refsList=[], authApi=null, authMode='signin', authMsg=null, authBusy=false, backTab='seed';
 function applyRoles(){ const e = me && me.verified ? me.email : ''; const lm = e===LM_EMAIL; ref = lm || (!!e && refsList.includes(e)); unlocked = lm; const b=$('#acct'); if(b) b.textContent = me ? (lm?'LM':ref?'Ref':'Account') : 'Sign in'; }
 function setRef(v){ ref=v; try{ v?sessionStorage.setItem('gp-ref','1'):sessionStorage.removeItem('gp-ref'); }catch(e){} }
 function refForm(){ return me ? (me.verified ? `<p class="muted">You’re signed in as ${esc(me.email)}, which isn’t set up as a ref. Ask the league manager to add you in LM Tools.</p>` : verifyBox()) : `<div class="refbox"><p class="muted">Refs and the league manager sign in to run the night.</p><button class="btn primary" data-go="acct">Sign in</button></div>`; }
@@ -781,7 +781,7 @@ function verifyBox(){ return `<div class="refbox"><p><b>Confirm your email.</b> 
 function acctView(){
   if(!authApi) return `<h2>Account</h2><div class="banner warn">Sign-in isn’t available right now. Check your connection and reload the page.</div>`;
   const m = authMsg ? `<p class="${authMsg.err?'err-text':'muted'}">${esc(authMsg.t)}</p>` : '';
-  if(me) return `<h2>Account</h2><p>Signed in as <b>${esc(me.email)}</b>.</p><p class="muted">${!me.verified?'Email not confirmed yet.':me.email===LM_EMAIL?'League manager: you can run nights and use LM Tools.':ref?'Ref: you can set up and run nights.':'This account can view everything. The league manager can add you as a ref in LM Tools.'}</p>${!me.verified?verifyBox():''}<div class="actions"><button class="btn" id="auth-out">Sign out</button></div>`;
+  if(me) return `<h2>Account</h2><p>Signed in as <b>${esc(me.email)}</b>.</p><p class="muted">${!me.verified?'Email not confirmed yet.':me.email===LM_EMAIL?'League manager: you can run nights and use LM Tools.':ref?'Ref: you can set up and run nights.':'This account can view everything. The league manager can add you as a ref in LM Tools.'}</p>${!me.verified?verifyBox():''}<div class="actions"><button class="btn" id="auth-out">Sign out</button><button class="btn" id="auth-diag">Check my access</button></div>${diagMsg?`<div class="refbox diag">${diagMsg}</div>`:''}`;
   const title = authMode==='signup'?'Create an account':authMode==='reset'?'Reset your password':'Sign in';
   return `<h2>${title}</h2><p class="muted">${authMode==='signup'?'For refs and the league manager. Use the email the league manager added for you.':authMode==='reset'?'We’ll email you a link to choose a new password.':'Only refs and the league manager need to sign in. Everyone else can view without an account.'}</p>
   <form class="refbox" id="authform"><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" required>
@@ -1281,6 +1281,12 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='lmlock'){ if(authApi) authApi.signOut(); renaming=null; confirming=null; editNight=null; draft=null; tab='seed'; render(); }
   else if(d.amode){ authMode=d.amode; authMsg=null; render(); const i=$('#auth-email'); if(i) i.focus(); }
+  else if(t.id==='auth-diag'){ diagMsg='Checking…'; render(); const L=[];
+    try{ const c=await authApi.claims(); L.push(`Login email: <b>${esc(c.email||'?')}</b>`, `Email confirmed on login: <b>${c.verified?'yes':'no'}</b>`); }catch(err){ L.push('Couldn’t read your login: '+esc(err.code||err.message||'')); }
+    const tryWrite=async(label,fn)=>{ try{ await Promise.race([fn(), new Promise((_,r)=>setTimeout(()=>r({code:'timeout'}),8000))]); L.push(`${label}: <b>allowed</b>`); }catch(err){ L.push(`${label}: <b>${esc(err.code||'failed')}</b>`); } };
+    await tryWrite('Save as ref (player list)', ()=>db.doc('club/roster').set({players:roster}));
+    await tryWrite('Save as league manager (settings)', ()=>db.doc('club/settings').set(JSON.parse(JSON.stringify(settings))));
+    diagMsg=L.join('<br>'); render(); }
   else if(t.id==='auth-out'){ authApi.signOut(); authMsg=null; tab='seed'; render(); }
   else if(t.id==='auth-resend'){ try{ await authApi.resend(); authMsg={t:'Sent. Check your inbox (and junk folder).'}; }catch(err){ authMsg={t:AUTH_ERR[err.code]||'Couldn’t send it. Try again in a minute.',err:true}; } render(); }
   else if(t.id==='auth-check'){ const u=await authApi.refresh(); me=u; authMsg = u&&u.verified ? null : {t:'Not confirmed yet. Tap the link in the email first.',err:true}; applyRoles(); render(); }
@@ -1497,6 +1503,7 @@ if (window.gpBackend === undefined) {
       signOut: () => A.signOut(auth),
       reset: e => A.sendPasswordResetEmail(auth, e),
       resend: () => auth.currentUser ? A.sendEmailVerification(auth.currentUser) : Promise.resolve(),
+      claims: async () => { if (!auth.currentUser) return null; const r = await auth.currentUser.getIdTokenResult(true); return { email: r.claims.email, verified: r.claims.email_verified }; },
       refresh: async () => { if (!auth.currentUser) return null; await auth.currentUser.reload(); await auth.currentUser.getIdToken(true); return user(auth.currentUser); }
     } };
   } catch (e) { console.error('Firebase did not load', e); window.gpBackend = null; }
