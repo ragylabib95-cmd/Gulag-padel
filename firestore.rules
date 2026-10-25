@@ -2,7 +2,8 @@ rules_version = '2';
 
 // Gulag Padel security rules.
 // Everyone can view the seeding, live courts and history.
-// Refs (emails listed in club/access) and the league manager can run nights.
+// Refs run nights: either with the shared ref password (checked here against club/refkey)
+// or with an email account listed in club/access.
 // Only the league manager can change settings, edit or delete saved nights, and manage refs.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -13,13 +14,37 @@ service cloud.firestore {
     function isLM() {
       return signedIn() && request.auth.token.email.lower() == 'ragy_labib@hotmail.com';
     }
+    function refKey() {
+      return get(/databases/$(database)/documents/club/refkey).data.key;
+    }
+    // a phone that entered the current ref password
+    function hasRefPass() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/club/refkey)
+        && exists(/databases/$(database)/documents/refSessions/$(request.auth.uid))
+        && get(/databases/$(database)/documents/refSessions/$(request.auth.uid)).data.key == refKey();
+    }
     function isRef() {
-      return isLM() || (signedIn()
+      return isLM() || hasRefPass() || (signedIn()
         && exists(/databases/$(database)/documents/club/access)
         && request.auth.token.email.lower() in get(/databases/$(database)/documents/club/access).data.refs);
     }
 
-    // the ref list: signed-in people can read it, only the LM changes it
+    // the ref password itself: nobody can read it, only the LM sets it
+    match /club/refkey {
+      allow read: if false;
+      allow write: if isLM();
+    }
+
+    // a phone's ref pass: created only when it matches the ref password
+    match /refSessions/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/club/refkey)
+        && request.resource.data.key == refKey();
+    }
+
+    // the ref email list: signed-in people can read it, only the LM changes it
     match /club/access {
       allow read: if signedIn();
       allow write: if isLM();
@@ -33,8 +58,8 @@ service cloud.firestore {
 
     // tonight's night, the player list and the change log: public to read, refs to change
     match /club/{docId} {
-      allow read: if docId != 'access';
-      allow write: if docId != 'access' && docId != 'settings' && isRef();
+      allow read: if docId != 'access' && docId != 'refkey';
+      allow write: if docId != 'access' && docId != 'settings' && docId != 'refkey' && isRef();
     }
 
     // saved nights: refs can save a finished night, only the LM can edit or delete one
