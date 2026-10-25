@@ -406,11 +406,56 @@ summary{cursor:pointer;font-weight:600}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
 </style>
+<style>
+/* splash: minimal wordmark, Outfit, thin cage bars over GULAG */
+#splash{position:fixed;inset:0;z-index:100;background:#8c3a1c;display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:opacity .8s ease}
+#splash.out{opacity:0;pointer-events:none}
+#splash .splash-in{display:flex;flex-direction:column;align-items:center;gap:18px}
+#splash .splash-mark{display:flex;align-items:center;gap:.55em;font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-size:clamp(24px,6.5vw,34px);color:#fff;line-height:1;opacity:0;transform:translateY(6px);animation:splashIn 2s cubic-bezier(.2,.7,.2,1) .4s forwards}
+#splash .s-gulag{position:relative;font-weight:600;letter-spacing:.22em;padding:.18em .1em .18em .32em;color:#f3d6a6}
+#splash .s-gulag::after{content:"";position:absolute;inset:0;border-top:1px solid rgba(255,255,255,.55);border-bottom:1px solid rgba(255,255,255,.55);background:repeating-linear-gradient(90deg,transparent 0 .62em,rgba(255,255,255,.5) .62em calc(.62em + 1px))}
+#splash .s-padel{display:inline-flex;align-items:center;font-weight:300;letter-spacing:.22em}
+#splash .s-padel svg{height:.86em;width:auto;margin-right:.08em}
+#splash .s-padel .head{fill:#f3d6a6}
+#splash .s-padel .hole{fill:#8c3a1c}
+#splash .s-padel .grip{fill:#fff}
+#splash .splash-bar{height:1px;width:0;background:rgba(255,255,255,.8);animation:splashBar 1.4s ease-out 1.9s forwards}
+#splash .splash-tag{font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-weight:300;font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:rgba(255,255,255,.75);opacity:0;animation:splashFade 1.2s ease 2.4s forwards}
+@keyframes splashIn{to{opacity:1;transform:none}}
+@keyframes splashBar{to{width:min(160px,40vw)}}
+#splash .splash-quote{font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-weight:300;font-style:italic;font-size:clamp(14px,3.8vw,17px);letter-spacing:.04em;color:rgba(255,255,255,.85);text-align:center;opacity:0;transform:translateY(4px);animation:splashQuote 1.4s ease 2.5s forwards}
+@keyframes splashQuote{to{opacity:1;transform:none}}
+@keyframes splashFade{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){#splash .splash-mark,#splash .splash-tag,#splash .splash-quote{animation-duration:.3s;animation-delay:0s;transform:none}#splash .splash-bar{animation:none;width:min(160px,40vw)}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;600&display=swap">
+<style>
+/* header wordmark: same minimal style as the loading screen */
+.hlogo{margin:0;display:flex;align-items:center;gap:.55em;font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-size:clamp(22px,6vw,28px);line-height:1;color:var(--court-fg)}
+.hlogo .s-gulag{position:relative;font-weight:600;letter-spacing:.22em;padding:.18em .1em .18em .32em;color:#f3d6a6}
+.hlogo .s-gulag::after{content:"";position:absolute;inset:0;border-top:1px solid rgba(255,255,255,.55);border-bottom:1px solid rgba(255,255,255,.55);background:repeating-linear-gradient(90deg,transparent 0 .62em,rgba(255,255,255,.5) .62em calc(.62em + 1px))}
+.hlogo .s-padel{display:inline-flex;align-items:center;font-weight:300;letter-spacing:.22em}
+.hlogo .s-padel svg{height:.86em;width:auto;margin-right:.08em}
+.hlogo .s-padel .head{fill:#f3d6a6}
+.hlogo .s-padel .hole{fill:var(--court)}
+.hlogo .s-padel .grip{fill:#fff}
+</style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><div class="splash-in"><div class="splash-mark"><span class="s-gulag">GULAG</span><span class="s-padel"><svg viewBox="0 0 40 56" aria-hidden="true"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></div><div class="splash-bar"></div><div class="splash-quote">“Don’t get stuck in the gulag”</div></div></div>
+<script>
+/* Splash: shown once per visit. Hidden as soon as the seeding has loaded and the logo has had its moment. */
+(function(){ var el=document.getElementById('splash'), seen=false;
+  try{ seen=sessionStorage.getItem('gp-splash')==='1'; sessionStorage.setItem('gp-splash','1'); }catch(e){}
+  if(seen){ el.remove(); return; }
+  var t0=Date.now(), quick=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches, MIN=quick?1200:5000, MAX=9000, done=false;
+  function hide(){ if(done) return; done=true; var wait=Math.max(0,MIN-(Date.now()-t0)); setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },700); },wait); }
+  window.__splashReady=hide; setTimeout(hide,MAX);
+})();
+</script>
 <div class="topband"><div class="topband-in">
 <header>
-    <h1 class="logo" aria-label="Gulag Padel"><span class="cage" aria-hidden="true">GULAG</span><span class="padel" aria-hidden="true"><svg class="racket-p" viewBox="0 0 40 56"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></h1>
+    <h1 class="hlogo" aria-label="Gulag Padel"><span class="s-gulag" aria-hidden="true">GULAG</span><span class="s-padel" aria-hidden="true"><svg viewBox="0 0 40 56" aria-hidden="true"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></h1>
     <div class="hdr-side"><div class="venue-name" id="venue-name"></div><div class="status" id="status">Loading</div><button class="acct" id="acct" type="button">Sign in</button></div>
   </header>
 </div></div>
@@ -1507,7 +1552,7 @@ const typing = () => { const a=document.activeElement; return a && a.tagName==='
 lsLoad(); render();
 (async()=>{
   const be = await new Promise(res=>{ if(window.gpBackend!==undefined) return res(window.gpBackend); window.addEventListener('gp-backend',()=>res(window.gpBackend),{once:true}); setTimeout(()=>res(window.gpBackend||null),15000); });
-  if(!be){ setStatus('Offline: changes are saved on this phone only', true); return; }
+  if(!be){ if(window.__splashReady) window.__splashReady(); setStatus('Offline: changes are saved on this phone only', true); return; }
   db = be.db; authApi = be.auth;
   let stopRefs=null;
   authApi.onChange(async u=>{ me=u; if(stopRefs){ stopRefs(); stopRefs=null; } refsList=[];
@@ -1520,7 +1565,7 @@ lsLoad(); render();
   db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
   db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
   db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
-  db.collection('nights').onSnapshot(q=>{ nights = q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */ if(!typing()) render(); }, ()=>{});
+  db.collection('nights').onSnapshot(q=>{ if(window.__splashReady) window.__splashReady(); nights = q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */ if(!typing()) render(); }, ()=>{});
 })();
 </script>
 
