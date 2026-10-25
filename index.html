@@ -400,6 +400,7 @@ summary{cursor:pointer;font-weight:600}
 .acct{background:rgba(0,0,0,.18);color:var(--court-fg);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;font:600 12px var(--body);text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
 .acct:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
 .refbox input{width:100%}
+.lm-sub{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .log .who{color:var(--fg)}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
@@ -482,7 +483,7 @@ function pastSeasons(){ return (settings.seasons&&settings.seasons.past)||[]; }
 function lsLoad(){ try{ const d=JSON.parse(localStorage.getItem(LS)||'{}'); roster=d.roster||[]; night=fix(d.night); nights=d.nights||[]; settings=d.settings||{}; changelog=d.changelog||[]; }catch(e){} }
 function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({roster,night,nights,settings,changelog})); }catch(e){} }
 const saveSettings = () => write('club/settings', JSON.parse(JSON.stringify(settings)));
-function logChange(what){ changelog=[{at:new Date().toISOString(), what, by:(typeof whoAmI==='function'?whoAmI():'')}, ...changelog].slice(0,300); write('club/changelog', {entries:changelog}); }
+function logChange(what, kind){ changelog=[{at:new Date().toISOString(), what, by:(typeof whoAmI==='function'?whoAmI():''), ...(kind?{kind}:{})}, ...changelog].slice(0,300); write('club/changelog', {entries:changelog}); }
 // Saves: always send the newest version of each document; a save that hangs times out so later saves still go through.
 const pending = {}, inflight = {}, lastLocal = {};
 const busyPath = p => !!(inflight[p] || pending[p] || Date.now()-(lastLocal[p]||0) < 4000);
@@ -911,8 +912,9 @@ function lmView(){
   if(!unlocked) return `<h2>LM Tools</h2><p class="muted">League manager tools.</p>${me&&me.verified?`<div class="banner">You’re signed in as ${esc(me.email)}. LM Tools are only for the league manager’s account.</div>`:me?verifyBox():`<div class="refbox"><p class="muted">Sign in with the league manager account to continue.</p><button class="btn primary" data-go="acct">Sign in</button></div>`}`;
   const played=new Set(nights.flatMap(n=>n.players||[])), names=[...roster].sort((a,b)=>a.localeCompare(b));
   // 1. players
+  const isNameEntry = x => x.kind==='name' || /^(Renamed |Merged |Removed .+ from the player list|Added \d+ player|Added new player|Made inactive|Reactivated)/.test(x.what||'');
   const row=p=>`<li class="lm-row${isInactive(p)?' off':''}">${renaming===p?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(p)}" autocomplete="off" aria-label="New name for ${esc(p)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`
-    :`<span class="lm-name">${esc(p)}${isInactive(p)?' <span class="tagx">Inactive</span>':''}${played.has(p)?'':' <span class="muted">(no games yet)</span>'}</span><span class="lm-act"><button class="btn sm" data-ren="${esc(p)}">Rename</button><button class="btn sm" data-active="${esc(p)}">${isInactive(p)?'Make active':'Make inactive'}</button>${confirming==='rm:'+p?`<button class="btn sm danger" data-rmyes="${esc(p)}">Confirm remove</button><button class="btn sm" id="rm-no">Cancel</button>`:`<button class="btn sm danger" data-rm="${esc(p)}">Remove</button>`}</span>`}</li>`;
+    :`<span class="lm-name">${esc(p)}${isInactive(p)?' <span class="tagx">Inactive</span>':''}${played.has(p)?'':' <span class="muted">(no games yet)</span>'}${(()=>{ const a=changelog.slice().reverse().find(x=>isNameEntry(x)&&(x.what||'').includes(p)&&/Added/.test(x.what)); return a?`<span class="lm-sub">Added ${esc(fmtWhen(a.at))}${a.by?` by ${esc(a.by)}`:''}</span>`:''; })()}${(()=>{ const nt=nights.filter(n=>(n.players||[]).includes(p)).sort((a,b)=>a.date<b.date?-1:1)[0]; if(!nt) return ''; const mates=[...new Set((nt.games||[]).flatMap(g=>(g.pairs||[]).filter(pr=>pr.includes(p)).flat()).filter(x=>x!==p))].slice(0,4); return `<span class="lm-sub">First night ${esc(new Date(nt.date).toLocaleDateString(undefined,{day:'numeric',month:'short'}))}${mates.length?`, partnered ${esc(mates.join(', '))}`:''}</span>`; })()}</span><span class="lm-act"><button class="btn sm" data-ren="${esc(p)}">Rename</button><button class="btn sm" data-active="${esc(p)}">${isInactive(p)?'Make active':'Make inactive'}</button>${confirming==='rm:'+p?`<button class="btn sm danger" data-rmyes="${esc(p)}">Confirm remove</button><button class="btn sm" id="rm-no">Cancel</button>`:`<button class="btn sm danger" data-rm="${esc(p)}">Remove</button>`}</span>`}</li>`;
   const players = `<p class="muted">Inactive players stay in the seeding and history but don’t show in setup or name suggestions. Remove takes someone off the list completely; their past games stay.</p><ul class="lm-list">${names.map(row).join('')}</ul>`;
   // 2. merge
   const merge = `<p class="muted">Combine two names for the same person. Every game and result of the first moves to the second, and the first name disappears.</p>
@@ -972,6 +974,9 @@ function lmView(){
   // score edit log
   const SL=scoreLog.slice(0, showAllScores?500:40), byNight={};
   const scoreBody = scoreLog.length ? `<p class="muted">Every result entered or changed, newest first, with who did it. Point slams and undone rounds are included.</p><ul class="log">${SL.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))} · <b class="who">${esc(x.by||'?')}</b>${x.night?` · night of ${esc(new Date(x.night).toLocaleDateString(undefined,{day:'numeric',month:'short'}))}`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${scoreLog.length>40?`<button class="btn sm" id="scores-more">${showAllScores?'Show fewer':`Show all ${scoreLog.length}`}</button>`:''}` : '<p class="muted">No score changes yet. Results entered or changed from now on appear here, with the ref’s name and the time.</p>';
+  // player name history
+  const NH = changelog.filter(isNameEntry);
+  const nameBody = `<p class="muted">Every new player, rename, merge and removal, newest first, with who did it. Older entries from before names were recorded show no name.</p>${NH.length?`<ul class="log">${NH.slice(0,200).map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}${x.by?` · <b class="who">${esc(x.by)}</b>`:''}</span>${esc(x.what)}</li>`).join('')}</ul>`:'<p class="muted">No name changes recorded yet.</p>'}`;
   // 7. change log
   const L=changelog.slice(0, showAllLog?300:30);
   const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}${x.by?` · <b class="who">${esc(x.by)}</b>`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
@@ -990,6 +995,7 @@ function lmView(){
   ${LMSEC('restore','Restore from backup',restore)}
   ${LMSEC('pw','Change password',pw)}
   ${LMSEC('scores','Score edit log',scoreBody, scoreLog.length?`${scoreLog.length} entries`:'')}
+  ${LMSEC('names','Player name history',nameBody, NH.length?`${NH.length} entries`:'')}
   ${LMSEC('log','Change log',log, changelog.length?`${changelog.length} entries`:'')}`;
 }
 async function saveManual(){
@@ -1128,7 +1134,7 @@ async function renamePlayer(old, nw, why){
   if(settings.inactive) settings.inactive=[...new Set(settings.inactive.map(sw))];
   if(settings.adjust) settings.adjust=settings.adjust.map(a=>({...a, name:sw(a.name)}));
   if(settings.ratings && settings.ratings[old]!=null){ if(settings.ratings[nw]==null) settings.ratings[nw]=settings.ratings[old]; delete settings.ratings[old]; }
-  saveSettings(); logChange(why || `Renamed ${old} to ${nw}`);
+  saveSettings(); logChange(why || `Renamed ${old} to ${nw}`, 'name');
   if(!db) lsSave();
   renaming=null; renameErr=''; setStatus('Name updated'); render();
 }
@@ -1228,7 +1234,7 @@ $('#main').addEventListener('submit', async e=>{
   e.preventDefault();
   if(e.target.id==='newpform'){ const v=$('#newp').value.trim().replace(/\s+/g,' '); if(!v) return;
     const known=knownNames().find(n=>n.toLowerCase()===v.toLowerCase()), name=known||v;
-    if(!roster.includes(name)){ roster.push(name); saveRoster(); addNote=`${name} added. Tap their name above to put them in tonight’s list.`; }
+    if(!roster.includes(name)){ roster.push(name); saveRoster(); logChange(`Added new player ${name} (Add button in setup)`, 'name'); addNote=`${name} added. Tap their name above to put them in tonight’s list.`; }
     else addNote=`${name} is already in the list above.`;
     justAdded=name; render(); const i=$('#newp'); if(i) i.focus(); return; }
   if(e.target.id==='refpassform'){ const v=$('#refpass').value, nmv=$('#refname').value.trim().replace(/\s+/g,' ');
@@ -1272,7 +1278,7 @@ $('#main').addEventListener('submit', async e=>{
   if(e.target.id==='pwform'){ const v=$('#pw').value; let ok=false; try{ ok=(await sha256(v))===activeHash(); }catch(err){}
     if(ok){ unlocked=true; if(lockPrompt==='round'){ lockPrompt=null; startRoundEdit(); } else startEdit(lockPrompt); } else { pwErr='That password isn’t right.'; render(); const i=$('#pw'); if(i) i.focus(); } return; }
   if(e.target.id==='lateform'){ const v=$('#latep').value.trim(); if(!v) return;
-    if(!roster.includes(v)){ roster.push(v); saveRoster(); }
+    if(!roster.includes(v)){ roster.push(v); saveRoster(); logChange(`Added new player ${v} (late arrival)`, 'name'); }
     const inPlay = night.courts.some(c=>[...c.a,...c.b].includes(v)) || night.bench.includes(v);
     if(!inPlay){ night.bench.push(v); night.left=night.left.filter(x=>x!==v); if(!night.arrivals.includes(v)) night.arrivals.push(v); saveNight(); }
     render(); }
@@ -1291,7 +1297,7 @@ $('#main').addEventListener('change', e=>{
   const i=e.target.dataset.name; if(i==null) return;
   { const typed=e.target.value.trim().replace(/\s+/g,' '), match=typed&&knownNames().find(n=>n.toLowerCase()===typed.toLowerCase()), name=match||typed;
     night.setup.names[+i]=name; saveNight();
-    if(name && !roster.includes(name)){ roster.push(name); saveRoster(); } }
+    if(name && !roster.includes(name)){ roster.push(name); saveRoster(); logChange(`Added new player ${name} (typed into spot ${+i+1} in setup)`, 'name'); } }
   const f=document.activeElement&&document.activeElement.id; render(); if(f&&$('#'+f)) $('#'+f).focus();
 });
 $('#main').addEventListener('keydown', e=>{
@@ -1339,12 +1345,12 @@ $('#main').addEventListener('click', async e=>{
   else if(d.refdel!=null){ refsList=refsList.filter(x=>x!==d.refdel); saveRefs(); logChange(`Removed ${d.refdel} as a ref`); render(); }
   else if(t.id==='restore-no'){ restorePlan=null; render(); }
   else if(t.id==='restore-go') runRestore();
-  else if(d.active!=null){ const p=d.active, on=isInactive(p); settings.inactive = on ? (settings.inactive||[]).filter(x=>x!==p) : [...(settings.inactive||[]), p]; saveSettings(); logChange(`${on?'Reactivated':'Made inactive'}: ${p}`); render(); }
+  else if(d.active!=null){ const p=d.active, on=isInactive(p); settings.inactive = on ? (settings.inactive||[]).filter(x=>x!==p) : [...(settings.inactive||[]), p]; saveSettings(); logChange(`${on?'Reactivated':'Made inactive'}: ${p}`, 'name'); render(); }
   else if(t.id==='merge-go'){ const [a,b]=mergeSel; if(!a||!b){ lmMsg.merge={t:'Choose both players.',err:true}; } else if(a===b){ lmMsg.merge={t:'Choose two different players.',err:true}; } else { confirming='merge-go'; lmMsg.merge=null; } render(); }
   else if(t.id==='merge-yes'){ const [a,b]=mergeSel; confirming=null; await renamePlayer(a,b,`Merged ${a} into ${b}`); mergeSel=['','']; lmMsg.merge={t:`Merged ${a} into ${b}.`}; render(); }
   else if(t.id==='bulk-go'){ const lines=($('#bulk-in').value||'').split(/\n|,/).map(x=>x.trim().replace(/\s+/g,' ')).filter(Boolean); const added=[], skipped=[];
     lines.forEach(n=>{ if(knownNames().some(k=>k.toLowerCase()===n.toLowerCase())||added.some(k=>k.toLowerCase()===n.toLowerCase())) skipped.push(n); else added.push(n); });
-    if(added.length){ roster.push(...added); saveRoster(); logChange(`Added ${added.length} player${added.length>1?'s':''}: ${added.join(', ')}`); }
+    if(added.length){ roster.push(...added); saveRoster(); logChange(`Added ${added.length} player${added.length>1?'s':''}: ${added.join(', ')}`, 'name'); }
     lmMsg.bulk = lines.length ? {t:`Added ${added.length}.${skipped.length?` Already on the list: ${skipped.join(', ')}.`:''}`} : {t:'Type at least one name.',err:true}; render(); }
   else if(t.id==='rate-go'){ const p=$('#rate-p').value, v=Math.round(+$('#rate-v').value);
     if(!p){ lmMsg.rate={t:'Choose a player.',err:true}; } else if(!(v>=600&&v<=1600)){ lmMsg.rate={t:'Use a rating between 600 and 1600.',err:true}; }
@@ -1417,7 +1423,7 @@ $('#main').addEventListener('click', async e=>{
   else if(d.go){ if(d.go==='acct') backTab=tab; tab=d.go; confirming=null; authMsg=null; render(); window.scrollTo(0,0); }
   else if(t.id==='reflock'){ editNames=false; render(); }
   else if(t.id==='editnames'){ editNames=!editNames; renaming=null; renameErr=''; confirming=null; render(); }
-  else if(d.rmyes!=null){ roster=roster.filter(p=>p!==d.rmyes); confirming=null; saveRoster(); logChange(`Removed ${d.rmyes} from the player list`); render(); }
+  else if(d.rmyes!=null){ roster=roster.filter(p=>p!==d.rmyes); confirming=null; saveRoster(); logChange(`Removed ${d.rmyes} from the player list`, 'name'); render(); }
 });
 
 /* ---------- name suggestions while typing ---------- */
