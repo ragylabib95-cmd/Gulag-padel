@@ -446,11 +446,11 @@ summary{cursor:pointer;font-weight:600}
 <script>
 /* Splash: shown once per visit. Hidden as soon as the seeding has loaded and the logo has had its moment. */
 (function(){ var el=document.getElementById('splash'), seen=false;
-  try{ seen=sessionStorage.getItem('gp-splash')==='1'; sessionStorage.setItem('gp-splash','1'); }catch(e){}
-  if(seen){ el.remove(); return; }
+  /* plays on every load; tap to skip */
   var t0=Date.now(), quick=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches, MIN=quick?1200:5000, MAX=9000, done=false;
   function hide(){ if(done) return; done=true; var wait=Math.max(0,MIN-(Date.now()-t0)); setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },700); },wait); }
   window.__splashReady=hide; setTimeout(hide,MAX);
+  el.addEventListener('click',function(){ done=true; el.classList.add('out'); setTimeout(function(){ el.remove(); },700); });
 })();
 </script>
 <div class="topband"><div class="topband-in">
