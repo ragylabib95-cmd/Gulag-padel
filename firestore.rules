@@ -14,13 +14,14 @@ service cloud.firestore {
     function isLM() {
       return signedIn() && request.auth.token.email.lower() == 'ragy_labib@hotmail.com';
     }
+    // the ref password: 'gulag' until the league manager sets a new one in LM Tools
     function refKey() {
-      return get(/databases/$(database)/documents/club/refkey).data.key;
+      return exists(/databases/$(database)/documents/club/refkey)
+        ? get(/databases/$(database)/documents/club/refkey).data.key : 'gulag';
     }
     // a phone that entered the current ref password
     function hasRefPass() {
       return request.auth != null
-        && exists(/databases/$(database)/documents/club/refkey)
         && exists(/databases/$(database)/documents/refSessions/$(request.auth.uid))
         && get(/databases/$(database)/documents/refSessions/$(request.auth.uid)).data.key == refKey();
     }
@@ -40,7 +41,6 @@ service cloud.firestore {
     match /refSessions/{uid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && exists(/databases/$(database)/documents/club/refkey)
         && request.resource.data.key == refKey();
     }
 
