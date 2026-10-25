@@ -482,7 +482,7 @@ function pastSeasons(){ return (settings.seasons&&settings.seasons.past)||[]; }
 function lsLoad(){ try{ const d=JSON.parse(localStorage.getItem(LS)||'{}'); roster=d.roster||[]; night=fix(d.night); nights=d.nights||[]; settings=d.settings||{}; changelog=d.changelog||[]; }catch(e){} }
 function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({roster,night,nights,settings,changelog})); }catch(e){} }
 const saveSettings = () => write('club/settings', JSON.parse(JSON.stringify(settings)));
-function logChange(what){ changelog=[{at:new Date().toISOString(), what}, ...changelog].slice(0,300); write('club/changelog', {entries:changelog}); }
+function logChange(what){ changelog=[{at:new Date().toISOString(), what, by:(typeof whoAmI==='function'?whoAmI():'')}, ...changelog].slice(0,300); write('club/changelog', {entries:changelog}); }
 // Saves: always send the newest version of each document; a save that hangs times out so later saves still go through.
 const pending = {}, inflight = {}, lastLocal = {};
 const busyPath = p => !!(inflight[p] || pending[p] || Date.now()-(lastLocal[p]||0) < 4000);
@@ -974,7 +974,7 @@ function lmView(){
   const scoreBody = scoreLog.length ? `<p class="muted">Every result entered or changed, newest first, with who did it. Point slams and undone rounds are included.</p><ul class="log">${SL.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))} · <b class="who">${esc(x.by||'?')}</b>${x.night?` · night of ${esc(new Date(x.night).toLocaleDateString(undefined,{day:'numeric',month:'short'}))}`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${scoreLog.length>40?`<button class="btn sm" id="scores-more">${showAllScores?'Show fewer':`Show all ${scoreLog.length}`}</button>`:''}` : '<p class="muted">No score changes yet. Results entered or changed from now on appear here, with the ref’s name and the time.</p>';
   // 7. change log
   const L=changelog.slice(0, showAllLog?300:30);
-  const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
+  const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}${x.by?` · <b class="who">${esc(x.by)}</b>`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
   return `<div class="row" style="justify-content:space-between;align-items:center"><h2>LM Tools</h2><button class="btn sm" id="lmlock">Lock</button></div>
   ${LMSEC('players',`Players (${names.length})`,players)}
   ${LMSEC('merge','Merge duplicates',merge)}
