@@ -1429,14 +1429,8 @@ function matchNames(q, exclude){
     const ql=q.replace(/[^a-z]/g,''), nl=l.replace(/[^a-z]/g,''); return ql.length>1 && nl.startsWith(ql) ? 3 : 9; };
   return knownNames().filter(n=>!exclude.includes(n)&&!isInactive(n)).map(n=>[score(n),n]).filter(([s])=>s<9 && s>=0).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])).slice(0,6).map(x=>x[1]);
 }
-// regulars: played at least 2 nights in the recent window (or anyone who has played, early in a season)
-function regulars(){
-  const since=Date.now()-S('fullWeeks')*7*DAY, n={};
-  nights.forEach(nt=>{ if(new Date(nt.date).getTime()>=since) (nt.players||[]).forEach(p=>{ n[p]=(n[p]||0)+1; }); });
-  let list=Object.keys(n).filter(p=>n[p]>=2&&!isInactive(p));
-  if(list.length<4) list=[...new Set(nights.flatMap(nt=>nt.players||[]))].filter(p=>!isInactive(p));
-  return list.sort((a,b)=>(n[b]||0)-(n[a]||0)||a.localeCompare(b));
-}
+// regulars: every registered player who isn't marked inactive (no games needed)
+function regulars(){ return knownNames().filter(p=>!isInactive(p)).sort((a,b)=>a.localeCompare(b)); }
 function hideSug(){ if(sugBox){ const h=sugBox.parentElement; sugBox.remove(); sugBox=null; if(h) h.classList.remove('sug-host'); } }
 function showSug(input){
   hideSug();
