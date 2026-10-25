@@ -400,6 +400,7 @@ summary{cursor:pointer;font-weight:600}
 .acct{background:rgba(0,0,0,.18);color:var(--court-fg);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 12px;font:600 12px var(--body);text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
 .acct:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
 .refbox input{width:100%}
+.log .who{color:var(--fg)}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
@@ -597,6 +598,7 @@ function nextRound(){
 function undoRound(){
   const u=(night.undo||[]).slice(); const last=u.pop(); if(!last) return;
   const prev=JSON.parse(last); prev.undo=u; night=fix(prev); confirming=null;
+  logScore(`Undid round ${night.round+1}: went back to round ${night.round} with its scores`);
   saveNight(); render(); window.scrollTo(0,0);
 }
 function advance(night){
@@ -776,18 +778,29 @@ const REF_HASH='239b052ff6654980bb7ac3c9e589564708f6428a850ffbf40b1e336ab6f85066
 const LM_EMAIL='ragy_labib@hotmail.com';
 let diagMsg='', ref=false, refErr='', me=null, refsList=[], authApi=null, authMode='signin', authMsg=null, authBusy=false, backTab='seed';
 let refPass=false; // this phone entered the shared ref password
-function applyRoles(){ const e = me && me.verified ? me.email : ''; const lm = e===LM_EMAIL; ref = lm || (!!e && refsList.includes(e)) || (!!me && me.anon && refPass); unlocked = lm; const b=$('#acct'); if(b) b.textContent = me ? (lm?'LM':ref?'Ref':'Account') : 'Sign in'; }
-async function enterRefPassword(pw){
+let refName=''; try{ refName=localStorage.getItem('gp-refname')||''; }catch(e){}
+// Score log: every result entered or changed, with who did it and when. Only the LM can read it.
+let scoreLog=[], stopScoreLog=null, showAllScores=false;
+const whoAmI = () => !me ? 'Not signed in' : me.anon ? (refName ? `${refName} (ref)` : 'Ref (no name)') : me.email===LM_EMAIL ? 'League manager' : me.email;
+const fmtRes = (pairs, sc) => sc&&sc[0]!=null&&sc[1]!=null ? `${tm(pairs[0])} ${sc[0]}–${sc[1]} ${tm(pairs[1])}` : sc&&(sc[0]!=null||sc[1]!=null) ? `${tm(pairs[0])} ${sc[0]??'–'}–${sc[1]??'–'} ${tm(pairs[1])} (not finished)` : 'no score';
+function logScore(what, nightDate){ if(!db) return; db.collection('scorelog').add({at:new Date().toISOString(), by:whoAmI(), night:nightDate||night.startedAt||'', what}).catch(()=>{}); }
+function ensureScoreLog(){
+  if(unlocked && db && !stopScoreLog) stopScoreLog = db.collection('scorelog').onSnapshot(q=>{ scoreLog=q.docs.map(d=>d.data()).sort((a,b)=>a.at<b.at?1:-1); if(tab==='lm'&&!typing()) render(); }, ()=>{}, {limit:500});
+  if(!unlocked && stopScoreLog){ stopScoreLog(); stopScoreLog=null; scoreLog=[]; }
+}
+function applyRoles(){ const e = me && me.verified ? me.email : ''; const lm = e===LM_EMAIL; ref = lm || (!!e && refsList.includes(e)) || (!!me && me.anon && refPass); unlocked = lm; ensureScoreLog(); const b=$('#acct'); if(b) b.textContent = me ? (lm?'LM':ref?'Ref':'Account') : 'Sign in'; }
+async function enterRefPassword(pw, name){
   if(!authApi || !db.raw) throw {code:'unavailable'};
   let uid = me && me.anon ? me.uid : null;
   if(!uid) uid = await authApi.anon();
-  try{ await db.raw('refSessions/'+uid).set({key:pw, at:new Date().toISOString()}); }
+  try{ await db.raw('refSessions/'+uid).set({key:pw, name, at:new Date().toISOString()}); }
   catch(err){ await authApi.signOut(); throw err; }
+  refName=name; try{ localStorage.setItem('gp-refname', name); }catch(e){}
   refPass=true; applyRoles();
 }
 function setRef(v){ ref=v; try{ v?sessionStorage.setItem('gp-ref','1'):sessionStorage.removeItem('gp-ref'); }catch(e){} }
 function refForm(){
-  if(!me || me.anon) return `<form class="refbox" id="refpassform"><label for="refpass">Ref password</label><div class="row"><input id="refpass" type="password" autocomplete="off" style="flex:1;min-width:0"><button class="btn primary" type="submit" ${authBusy?'disabled':''}>Run the night</button></div>${refErr?`<p class="err-text">${esc(refErr)}</p>`:''}<p class="muted" style="margin:8px 0 0">League manager? <button class="linkbtn" type="button" data-go="acct">Sign in here</button></p></form>`;
+  if(!me || me.anon) return `<form class="refbox" id="refpassform"><label for="refname">Your name</label><input id="refname" autocomplete="name" autocapitalize="words" value="${esc(refName)}" placeholder="So score changes show who made them" style="margin-bottom:10px"><label for="refpass">Ref password</label><div class="row"><input id="refpass" type="password" autocomplete="off" style="flex:1;min-width:0"><button class="btn primary" type="submit" ${authBusy?'disabled':''}>Run the night</button></div>${refErr?`<p class="err-text">${esc(refErr)}</p>`:''}<p class="muted" style="margin:8px 0 0">League manager? <button class="linkbtn" type="button" data-go="acct">Sign in here</button></p></form>`;
   return me.verified ? `<p class="muted">You’re signed in as ${esc(me.email)}, which isn’t set up as a ref. Ask the league manager to add you in LM Tools.</p>` : verifyBox(); }
 function verifyBox(){ return `<div class="refbox"><p><b>Confirm your email.</b> We sent a link to ${esc(me.email)}. Tap it, then come back here.</p><div class="row"><button class="btn primary" id="auth-check">I’ve confirmed</button><button class="btn" id="auth-resend">Send the link again</button></div>${authMsg?`<p class="${authMsg.err?'err-text':'muted'}">${esc(authMsg.t)}</p>`:''}</div>`; }
 function acctView(){
@@ -956,6 +969,9 @@ function lmView(){
     ${refsList.length?`<ul class="lm-list">${refsList.map(e=>`<li class="lm-row"><span class="lm-name">${esc(e)}</span><button class="btn sm danger" data-refdel="${esc(e)}">Remove</button></li>`).join('')}</ul>`:'<p class="muted">No refs yet. You can run nights yourself as league manager.</p>'}`;
   // restore
   const restore = `<p class="muted">Bring players, nights, settings and the change log in from a Gulag Padel backup file (for example the one downloaded from the old Claude version). Nights already here are skipped, so it’s safe to run twice.</p><input type="file" id="restore-file" accept=".json,application/json">${restorePlan?`<div class="confirm"><p>This backup has <b>${restorePlan.nights.length}</b> night${restorePlan.nights.length===1?'':'s'} to add${restorePlan.skip?` (${restorePlan.skip} already here)`:''}, <b>${restorePlan.newPlayers.length}</b> new player${restorePlan.newPlayers.length===1?'':'s'} and the settings.</p><div class="row"><button class="btn primary" id="restore-go">Import</button><button class="btn" id="restore-no">Cancel</button></div></div>`:''}${note('restore')}`;
+  // score edit log
+  const SL=scoreLog.slice(0, showAllScores?500:40), byNight={};
+  const scoreBody = scoreLog.length ? `<p class="muted">Every result entered or changed, newest first, with who did it. Point slams and undone rounds are included.</p><ul class="log">${SL.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))} · <b class="who">${esc(x.by||'?')}</b>${x.night?` · night of ${esc(new Date(x.night).toLocaleDateString(undefined,{day:'numeric',month:'short'}))}`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${scoreLog.length>40?`<button class="btn sm" id="scores-more">${showAllScores?'Show fewer':`Show all ${scoreLog.length}`}</button>`:''}` : '<p class="muted">No score changes yet. Results entered or changed from now on appear here, with the ref’s name and the time.</p>';
   // 7. change log
   const L=changelog.slice(0, showAllLog?300:30);
   const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
@@ -973,6 +989,7 @@ function lmView(){
   ${LMSEC('refs',`Refs (${refsList.length})`,refsBody)}
   ${LMSEC('restore','Restore from backup',restore)}
   ${LMSEC('pw','Change password',pw)}
+  ${LMSEC('scores','Score edit log',scoreBody, scoreLog.length?`${scoreLog.length} entries`:'')}
   ${LMSEC('log','Change log',log, changelog.length?`${changelog.length} entries`:'')}`;
 }
 async function saveManual(){
@@ -1042,6 +1059,7 @@ function startRoundEdit(){ rDraft=JSON.parse(JSON.stringify(night.log.filter(g=>
 function saveRound(redo){
   if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; confirming=null; render(); return; }
   const r=viewRound;
+  rDraft.forEach(g=>{ const o=night.log.find(x=>x.round===r&&x.court===g.court); if(o && JSON.stringify(o.score)!==JSON.stringify(g.score)) logScore(`Fixed round ${r}, ${courtName(g.court,g.courts||1)}: ${fmtRes(o.pairs,o.score)} to ${fmtRes(g.pairs,g.score)}${o.winner!==g.winner?' (winner changed)':''}${redo&&o.winner!==g.winner?', lineup redrawn':''}`); });
   if(redo && canRedoLineup(r)){
     const u=night.undo.slice(), prev=JSON.parse(u.pop());
     rDraft.forEach(g=>{ const c=prev.courts[g.court]; if(c){ c.score=g.score; c.winner=g.winner; } });
@@ -1196,6 +1214,7 @@ async function saveEdit(){
   if(draft.some(g=>g.pairs && g.winner==null)){ editErr='Some games don’t have a winner yet. Give one team 3.'; render(); return; }
   if(editNight==='tonight'){ night.log=draft; saveNight(); editNight=null; draft=null; setStatus('Scores updated'); render(); return; }
   const nt=nights.find(n=>n.date===editNight); if(!nt) return;
+  draft.forEach((g,i)=>{ const o=(nt.games||[])[i]; if(o && g.pairs && JSON.stringify(o.score)!==JSON.stringify(g.score)) logScore(`Edited saved night, round ${g.round}, ${courtName(g.court,g.courts||1)}: ${fmtRes(o.pairs,o.score)} to ${fmtRes(g.pairs,g.score)}${o.winner!==g.winner?' (winner changed)':''}`, nt.date); });
   const rec={...nt, games:draft}; delete rec._id;
   if(db && nt._id){ try{ await db.doc('nights/'+nt._id).set(rec); }catch(e){ editErr='Couldn’t save. Check your connection and try again.'; render(); return; } }
   else { Object.assign(nt, rec); lsSave(); }
@@ -1212,8 +1231,10 @@ $('#main').addEventListener('submit', async e=>{
     if(!roster.includes(name)){ roster.push(name); saveRoster(); addNote=`${name} added. Tap their name above to put them in tonight’s list.`; }
     else addNote=`${name} is already in the list above.`;
     justAdded=name; render(); const i=$('#newp'); if(i) i.focus(); return; }
-  if(e.target.id==='refpassform'){ const v=$('#refpass').value; if(!v) return; authBusy=true; refErr=''; render();
-    try{ await enterRefPassword(v); refErr=''; tab='night'; }
+  if(e.target.id==='refpassform'){ const v=$('#refpass').value, nmv=$('#refname').value.trim().replace(/\s+/g,' ');
+    if(!nmv){ refErr='Add your name first.'; render(); const i=$('#refname'); if(i) i.focus(); return; }
+    if(!v) return; authBusy=true; refErr=''; refName=nmv; render();
+    try{ await enterRefPassword(v, nmv); refErr=''; tab='night'; }
     catch(err){ refErr = err&&err.code==='permission-denied' ? 'That password isn’t right.' : err&&err.code==='auth/operation-not-allowed' ? 'Ref passwords aren’t switched on yet. Ask the league manager.' : 'Couldn’t check the password. Check your connection and try again.'; }
     authBusy=false; render(); if(refErr){ const i=$('#refpass'); if(i) i.focus(); } return; }
   if(e.target.id==='refpwset'){ const v=$('#refpw-new').value.trim();
@@ -1349,6 +1370,7 @@ $('#main').addEventListener('click', async e=>{
     settings.seasons={current:{name:pendingSeason, start:now}, past:[...pastSeasons(), {name:cur.name, start:cur.start||first, end:now}]}; saveSettings(); logChange(`Started a new season: ${pendingSeason}`); confirming=null; lmMsg.season={t:`${pendingSeason} has started. ${cur.name} is saved under Seeding.`}; render(); }
   else if(t.id==='dl-csv') download('csv');
   else if(t.id==='dl-json') download('json');
+  else if(t.id==='scores-more'){ showAllScores=!showAllScores; render(); }
   else if(t.id==='log-more'){ showAllLog=!showAllLog; render(); }
   else if(t.id==='rm-no'){ confirming=null; render(); }
   else if(d.vround!=null){ viewRound = d.vround==='live' ? null : +d.vround; rDraft=null; rErr=''; confirming=null; lockPrompt=null; render(); window.scrollTo(0,0); }
@@ -1359,7 +1381,9 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='rsave-keep') saveRound(false);
   else if(t.id==='rsave-redo') saveRound(true);
   else if(t.id==='rflip-back'){ confirming=null; render(); }
-  else if(d.slam){ const [tm,v]=d.slam.split(':').map(Number); const st=slamState(night); if(st){ const sc=night.slam.score; sc[tm]=sc[tm]===v?null:v; if(v===2&&sc[1-tm]===2) sc[1-tm]=null; saveNight(); render(); } }
+  else if(d.slam){ const [tmi,v]=d.slam.split(':').map(Number); const st=slamState(night); if(st){ const sc=night.slam.score, bw=st.winner; sc[tmi]=sc[tmi]===v?null:v; if(v===2&&sc[1-tmi]===2) sc[1-tmi]=null; saveNight(); render();
+    const now=slamState(night); if(now && now.winner!=null && now.winner!==bw) logScore(`Round ${night.round}, point slam: ${now.pair[now.winner]} beat ${now.pair[1-now.winner]}${sc[1-now.winner]!=null?` ${sc[now.winner]}–${sc[1-now.winner]}`:''}`);
+    else if(now && bw!=null && now.winner==null) logScore(`Round ${night.round}, point slam result cleared (${now.pair[0]} vs ${now.pair[1]})`); } }
   else if(t.id==='next-no'){ confirming=null; render(); }
   else if(t.id==='undo'){ confirming='undo'; render(); }
   else if(t.id==='undo-yes') undoRound();
@@ -1378,7 +1402,12 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='addcourt') addCourtFromSubs();
   else if(d.opt){ const [ci,k]=d.opt.split(':').map(Number), c=night.courts[ci]; c.pairs=allOptions(c)[k]; c.face='picked'; saveNight(); render(); }
   else if(d.redraw!=null){ const c=night.courts[+d.redraw]; c.pairs=null; c.face=null; c.score=null; c.winner=null; saveNight(); render(); }
-  else if(d.score){ const [ci,tm,v]=d.score.split(':').map(Number); setScore(night.courts[ci],tm,v); saveNight(); render(); }
+  else if(d.score){ const [ci,tmi,v]=d.score.split(':').map(Number), c=night.courts[ci];
+    setScore(c,tmi,v);
+    if(c.winner!=null){ const res=fmtRes(c.pairs,c.score), where=`Round ${night.round}, ${courtName(ci,night.courts.length)}`;
+      if(!c.loggedRes) logScore(`${where}: result ${res}`); else if(c.loggedRes!==res) logScore(`${where}: changed ${c.loggedRes} to ${res}`);
+      c.loggedRes=res; }
+    saveNight(); render(); }
   else if(t.id==='end'){ confirming='end'; render(); }
   else if(t.id==='end-no'){ confirming=null; render(); }
   else if(t.id==='end-yes') endNight();
@@ -1400,11 +1429,20 @@ function matchNames(q, exclude){
     const ql=q.replace(/[^a-z]/g,''), nl=l.replace(/[^a-z]/g,''); return ql.length>1 && nl.startsWith(ql) ? 3 : 9; };
   return knownNames().filter(n=>!exclude.includes(n)&&!isInactive(n)).map(n=>[score(n),n]).filter(([s])=>s<9 && s>=0).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])).slice(0,6).map(x=>x[1]);
 }
+// regulars: played at least 2 nights in the recent window (or anyone who has played, early in a season)
+function regulars(){
+  const since=Date.now()-S('fullWeeks')*7*DAY, n={};
+  nights.forEach(nt=>{ if(new Date(nt.date).getTime()>=since) (nt.players||[]).forEach(p=>{ n[p]=(n[p]||0)+1; }); });
+  let list=Object.keys(n).filter(p=>n[p]>=2&&!isInactive(p));
+  if(list.length<4) list=[...new Set(nights.flatMap(nt=>nt.players||[]))].filter(p=>!isInactive(p));
+  return list.sort((a,b)=>(n[b]||0)-(n[a]||0)||a.localeCompare(b));
+}
 function hideSug(){ if(sugBox){ const h=sugBox.parentElement; sugBox.remove(); sugBox=null; if(h) h.classList.remove('sug-host'); } }
 function showSug(input){
   hideSug();
   const used = input.dataset.name!=null ? setupNames().filter((n,i)=>i!==+input.dataset.name) : input.id==='newp' ? setupNames() : [];
-  const list = matchNames(input.value, used); if(!list.length) return;
+  const list = input.id==='refname' ? (()=>{ const q=input.value.trim().toLowerCase(), R=regulars(); return (q ? R.filter(n=>n.toLowerCase().split(/[\s.\-]+/).some(w=>w.startsWith(q))||n.toLowerCase().startsWith(q)) : R).filter(n=>n.toLowerCase()!==q).slice(0,6); })() : matchNames(input.value, used);
+  if(!list.length) return;
   sugBox=document.createElement('div'); sugBox.className='suggest'; sugBox.setAttribute('role','listbox');
   sugBox.innerHTML=list.map(n=>`<button type="button" role="option" data-sug="${esc(n)}">${esc(n)}</button>`).join('');
   const host=input.parentElement; host.classList.add('sug-host'); host.appendChild(sugBox);
@@ -1418,7 +1456,8 @@ function pickSug(input, name){
   else if(input.id==='newp'){ input.value=name; input.form.requestSubmit(); }
   else { input.value=name; input.dispatchEvent(new Event('change',{bubbles:true})); input.focus(); }
 }
-$('#main').addEventListener('input', e=>{ const t=e.target; if(t.dataset.name!=null || t.dataset.mn!=null || t.id==='newp' || t.id==='latep') showSug(t); });
+$('#main').addEventListener('input', e=>{ const t=e.target; if(t.dataset.name!=null || t.dataset.mn!=null || t.id==='newp' || t.id==='latep' || t.id==='refname') showSug(t); });
+$('#main').addEventListener('focusin', e=>{ if(e.target.id==='refname') showSug(e.target); });
 // LM sections remember which are open across re-renders
 $('#main').addEventListener('click', e=>{ const sm=e.target.closest('details[data-lm] > summary'); if(sm){ const dt=sm.parentElement, k=dt.dataset.lm; setTimeout(()=>{ dt.open?lmOpen.add(k):lmOpen.delete(k); },0); } });
 $('#main').addEventListener('focusout', e=>{ if(sugBox && !(e.relatedTarget && sugBox.contains(e.relatedTarget))) setTimeout(hideSug,120); });
@@ -1513,7 +1552,7 @@ if (window.gpBackend === undefined) {
         onSnapshot: (next, err) => F.onSnapshot(r, s => next(wrap(s)), err) }; },
       collection: path => { const c = F.collection(fs, path); return {
         add: b => F.addDoc(c, body(b)),
-        onSnapshot: (next, err) => F.onSnapshot(c, q => next({ docs: q.docs.map(d => ({ id: d.id, data: () => JSON.parse(d.data().json || '{}') })) }), err) }; },
+        onSnapshot: (next, err, opt) => F.onSnapshot(opt && opt.limit ? F.query(c, F.orderBy('at', 'desc'), F.limit(opt.limit)) : c, q => next({ docs: q.docs.map(d => ({ id: d.id, data: () => JSON.parse(d.data().json || '{}') })) }), err) }; },
       // plain document (the ref list), readable by the security rules
       raw: path => { const r = F.doc(fs, path); return {
         set: b => F.setDoc(r, b),

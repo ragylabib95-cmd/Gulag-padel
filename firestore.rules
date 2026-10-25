@@ -62,6 +62,13 @@ service cloud.firestore {
       allow write: if docId != 'access' && docId != 'settings' && docId != 'refkey' && isRef();
     }
 
+    // score edit log: refs and the LM add entries, only the LM can read them, nobody can change them
+    match /scorelog/{entryId} {
+      allow read: if isLM();
+      allow create: if isRef();
+      allow update, delete: if false;
+    }
+
     // saved nights: refs can save a finished night, only the LM can edit or delete one
     match /nights/{nightId} {
       allow read: if true;
