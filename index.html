@@ -449,6 +449,17 @@ summary{cursor:pointer;font-weight:600}
 .late-banner p{margin:0}
 .late-banner.ready{border-left-color:var(--ball)}
 .late-banner.ready p{margin:0 0 10px}
+.arr-num.drag{display:flex;align-items:center;justify-content:flex-end;gap:4px;background:none;border:0;padding:6px 2px;margin:-6px 0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;color:var(--muted);font:700 18px var(--display);font-variant-numeric:tabular-nums}
+.arr-num.drag svg{width:7px;height:13px;fill:currentColor;opacity:.55;flex:none}
+.arr-num.drag:focus-visible{outline:3px solid var(--ball);outline-offset:2px;border-radius:6px}
+.arr-row{grid-template-columns:44px 1fr 30px;border-radius:10px;transition:background .15s}
+.arr-row.picked{background:color-mix(in srgb,var(--ball) 28%,transparent)}
+.arr-row.picked .arr-num{color:var(--fg)}
+.arr-row.drop{background:color-mix(in srgb,var(--court) 18%,transparent);outline:2px dashed var(--court);outline-offset:2px}
+.arr-row.lifted{opacity:.35}
+.drag-ghost{position:fixed;z-index:80;pointer-events:none;background:var(--surface);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.28);transform:scale(1.03);padding:4px 0}
+body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.swap-hint{margin:2px 0 8px;font-size:13px}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
@@ -881,6 +892,43 @@ function saveAnn(){
 // keep the Announcement tab in step with the clock while the page is open
 setInterval(()=>{ const has=!!activeAnn(); if(tab==='ann' && !has){ tab='seed'; render(); } else { const b=document.querySelector('nav [data-tab="ann"]'); if(b && b.hidden===has) render(); } }, 30000);
 
+/* ---------- setup: swap two spots by dragging a number, or tapping two numbers ---------- */
+let swapSel=null;
+function swapSlots(i,j){ if(i===j) return; const s=night.setup, L=s.courts*4+s.subs; s.names=Array.from({length:Math.max(L,s.names.length)},(_,k)=>s.names[k]||''); [s.names[i],s.names[j]]=[s.names[j],s.names[i]]; swapSel=null; saveNight(); render(); }
+(function(){
+  let drag=null;
+  const rowAt=(x,y)=>{ const el=document.elementFromPoint(x,y); const r=el&&el.closest('.arr-row[data-slot]'); return r?+r.dataset.slot:null; };
+  const clear=()=>document.querySelectorAll('.arr-row.drop').forEach(r=>r.classList.remove('drop'));
+  function end(e, cancel){
+    if(!drag) return; const d=drag; drag=null; clearTimeout(d.timer); clearInterval(d.scroller);
+    if(d.ghost) d.ghost.remove(); clear(); document.body.classList.remove('dragging');
+    if(d.src) d.src.classList.remove('lifted');
+    if(cancel) return;
+    if(d.active){ const to=rowAt(e.clientX,e.clientY); if(to!=null && to!==d.from) swapSlots(d.from,to); }
+    else { // a tap: pick, swap with the picked one, or cancel
+      if(swapSel==null){ swapSel=d.from; render(); } else if(swapSel===d.from){ swapSel=null; render(); } else swapSlots(swapSel,d.from); }
+  }
+  $('#main').addEventListener('pointerdown', e=>{
+    const h=e.target.closest('.drag[data-slot]'); if(!h || e.button>0) return;
+    e.preventDefault(); const row=h.closest('.arr-row');
+    drag={from:+h.dataset.slot, x:e.clientY, y0:e.clientY, x0:e.clientX, active:false, src:row, id:e.pointerId};
+    const start=()=>{ if(!drag||drag.active) return; drag.active=true; document.body.classList.add('dragging'); row.classList.add('lifted');
+      const g=row.cloneNode(true); g.classList.add('drag-ghost'); const r=row.getBoundingClientRect(); g.style.width=r.width+'px'; g.style.left=r.left+'px'; g.style.top=r.top+'px'; drag.dy=e.clientY-r.top; document.body.appendChild(g); drag.ghost=g;
+      try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){}
+      drag.scroller=setInterval(()=>{ if(!drag) return; const y=drag.lastY||drag.y0, H=window.innerHeight; if(y<70) window.scrollBy(0,-12); else if(y>H-70) window.scrollBy(0,12); },16); };
+    drag.timer=setTimeout(start,220); drag.start=start;
+  });
+  window.addEventListener('pointermove', e=>{
+    if(!drag) return; drag.lastY=e.clientY;
+    if(!drag.active && (Math.abs(e.clientY-drag.y0)>8 || Math.abs(e.clientX-drag.x0)>8)) drag.start();
+    if(!drag.active) return; e.preventDefault();
+    drag.ghost.style.top=(e.clientY-drag.dy)+'px';
+    clear(); const to=rowAt(e.clientX,e.clientY); if(to!=null && to!==drag.from){ const r=document.querySelector(`.arr-row[data-slot="${to}"]`); if(r) r.classList.add('drop'); }
+  }, {passive:false});
+  window.addEventListener('pointerup', e=>end(e,false));
+  window.addEventListener('pointercancel', e=>end(e,true));
+})();
+
 /* ---------- night summary ---------- */
 let justEnded=null, sumOpen=null, copied=null, copyFallback=null;
 function summaryData(date){
@@ -1020,7 +1068,7 @@ function setupView(){
   const rows = names.map((p,i)=>{
     const ci=Math.floor(i/4), sub=ci>=k, lab = sub ? 'Sub' : courtName(ci,k);
     const head = !sub && i%4===0 ? `<div class="tier-lab${k>1&&ci===k-1?' gul':''}">${lab}</div>` : sub && i===need ? `<div class="tier-lab sub">Gulag subs</div>` : '';
-    return `${head}<div class="arr-row${sub?' extra':''}"><span class="arr-num">${i+1}</span><input id="name-${i}" data-name="${i}" autocomplete="off" autocapitalize="words" placeholder="${sub?'Sub (optional)':'Tap a name above or type'}" value="${esc(p)}">${p?`<button class="x" data-clear="${i}" aria-label="Clear ${esc(p)}">×</button>`:'<span></span>'}</div>`;
+    return `${head}<div class="arr-row${sub?' extra':''}${swapSel===i?' picked':''}" data-slot="${i}"><button type="button" class="arr-num drag" data-slot="${i}" aria-label="Spot ${i+1}${p?`, ${esc(p)}`:''}: drag to another spot, or tap then tap another spot, to swap"><svg viewBox="0 0 8 14" aria-hidden="true"><circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="6" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="6" cy="12" r="1.3"/></svg>${i+1}</button><input id="name-${i}" data-name="${i}" autocomplete="off" autocapitalize="words" placeholder="${sub?'Sub (optional)':'Tap a name above or type'}" value="${esc(p)}">${p?`<button class="x" data-clear="${i}" aria-label="Clear ${esc(p)}">×</button>`:'<span></span>'}</div>`;
   }).join('');
   return `
   ${justEnded?`<div class="saved-night">${summaryCard(justEnded,'Night saved')}<button class="btn sm" id="sum-dismiss">Done</button></div>`:''}
@@ -1032,6 +1080,7 @@ function setupView(){
   <p class="muted">${need+s.subs} players: ${k>1?`${k-1} tier${k>2?'s':''} plus the gulag`:'one court'}${s.subs?`, ${s.subs} sub${s.subs>1?'s':''} waiting on the gulag`:''}. Write names in arrival order. First in play Tier 1.</p>
   <div class="played"><div class="played-head"><b>${known.length?'Played before':'Players'}</b><span class="muted">${known.length?'Tap in arrival order. Tap again to take them off.':'Add players below in arrival order.'}</span></div>${known.length?`<div class="chips">${chips}</div>`:''}
   <form class="row newp" id="newpform"><input id="newp" autocomplete="off" placeholder="New player name" aria-label="New player name"><button class="btn sm primary" type="submit">Add</button></form>${addNote?`<p class="muted add-note">${esc(addNote)}</p>`:''}</div>
+  ${filled>1?`<p class="muted swap-hint">${swapSel!=null?`<b>Spot ${swapSel+1} picked.</b> Tap another spot’s number to swap, or tap it again to cancel.`:'To move someone, press and hold a spot’s number and drag it onto another spot, or tap one number then another. The two players swap.'}</p>`:''}
   <div class="arrivals">${rows}</div>
   <div class="row" style="justify-content:space-between"><span class="count ${missing?'bad':'ok'}">${filled} of ${need+s.subs}</span><span class="muted">${!s.venue?'Pick a venue':missing?`${missing} court spot${missing>1?'s':''} still empty`:'Ready to play'}</span></div>
   ${(()=>{ const can=Math.min(k,Math.floor(filled/4)); return missing&&s.venue&&can>=1 ? `<div class="early-start"><p><b>Not everyone’s here yet?</b> Start with the ${filled} who are. ${can===1?'They play on 1 court':`They fill the top ${can} courts`}${filled-can*4?` and ${filled-can*4} wait${filled-can*4===1?'s':''} as a sub`:''}. Add latecomers as late arrivals; once 4 are waiting you can open the next court.</p><button class="btn primary" id="start-partial">Start with ${can} court${can>1?'s':''} now</button></div>` : ''; })()}
