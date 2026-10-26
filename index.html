@@ -402,6 +402,26 @@ summary{cursor:pointer;font-weight:600}
 .refbox input{width:100%}
 .lm-sub{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .log .who{color:var(--fg)}
+.kotc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 12px}
+.kotc-lab{display:flex;align-items:center;gap:6px;font-weight:600;font-size:15px;flex-wrap:wrap}
+.kotc-lab .crown{width:18px;height:14px}
+.kswitch{flex:none;width:48px;height:28px;border-radius:999px;border:0;background:var(--line);position:relative;cursor:pointer;transition:background .2s}
+.kswitch span{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s}
+.kswitch.on{background:var(--ball)}
+.kswitch.on span{left:23px}
+.kswitch:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+.crown{width:1em;height:.78em;fill:#e9b44c;vertical-align:-.05em;margin-right:.3em;flex:none}
+.team.king .tn b{display:inline-flex;align-items:center;flex-wrap:wrap;column-gap:.25em}
+.team.king .hint{color:#b8860b}
+.court.kotc{border-color:#e9b44c}
+.court.reign{box-shadow:0 0 0 2px #e9b44c, 0 0 18px rgba(233,180,76,.45)}
+.team.streak .crown{filter:drop-shadow(0 0 3px rgba(233,180,76,.9))}
+@media (prefers-reduced-motion:no-preference){
+  .team.streak .crown{animation:crownBob 1.8s ease-in-out infinite}
+  .court.reign{animation:reignGlow 2.4s ease-in-out infinite}
+}
+@keyframes crownBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-3px) rotate(4deg)}}
+@keyframes reignGlow{0%,100%{box-shadow:0 0 0 2px #e9b44c, 0 0 10px rgba(233,180,76,.3)}50%{box-shadow:0 0 0 2px #e9b44c, 0 0 24px rgba(233,180,76,.65)}}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
@@ -475,6 +495,7 @@ summary{cursor:pointer;font-weight:600}
       <li>Win and you level up a tier. Lose and you drop a tier.</li>
       <li>Win on Tier 1 and you stay on the court.</li>
       <li>Lose in the gulag and you’re subbed off with your teammate.</li>
+      <li>King of the court (trial): from round 3 the pair that wins Tier 1 stays together as the kings until they lose. The Tier 2 winners come up as a pair to challenge them. A ref can switch it on or off any round.</li>
       <li>With 3 subs, the pair who just lost in the gulag play a best-of-3 point slam while they sit out. The winner takes the second sub spot next round.</li>
       <li>After every game you face your old teammate: whether you went up, came down, stayed on Tier 1 or subbed back on. Flip the racket or pick the teams yourself; either way you partner someone from the other pair.</li>
       <li>Games are first to 3. Scores feed tonight’s ranking and the overall seedings.</li>
@@ -647,9 +668,19 @@ function undoRound(){
   logScore(`Undid round ${night.round+1}: went back to round ${night.round} with its scores`);
   saveNight(); render(); window.scrollTo(0,0);
 }
+/* King of the court (trial): from round 3 by default, or whenever a ref switches it on, the pair that wins Tier 1
+   stays together as the kings until they lose. Challengers are the Tier 2 winners, as the pair that won. */
+const kotcOn = (N, round) => N.kotc===true ? true : N.kotc===false ? false : round>=3;
+const pairKey = pr => [...pr].sort().join('|');
+function reignOf(log, pair){ // consecutive Tier 1 wins by this exact pair, most recent first
+  const k=pairKey(pair); let r=0;
+  log.filter(g=>g.court===0 && g.pairs && g.winner!=null).sort((a,b)=>b.round-a.round).some(g=>{ if(pairKey(g.pairs[g.winner])===k){ r++; return false; } return true; });
+  return r;
+}
+function crownCourt(c, log){ c.kotc=true; c.kings=[...c.a]; c.pairs=[[...c.a],[...c.b]]; c.face='kotc'; c.reign=Math.max(1,reignOf(log,c.a)); c.aLab='Kings'; c.bLab='Challengers'; }
 function advance(night){
   const C = night.courts, n=C.length;
-  C.forEach((c,i)=> night.log.push({round:night.round, court:i, courts:n, pairs:c.pairs, score:c.score, winner:c.winner}));
+  C.forEach((c,i)=> night.log.push({round:night.round, court:i, courts:n, pairs:c.pairs, score:c.score, winner:c.winner, ...(c.kotc?{kotc:true}:{})}));
   const W = C.map(c=>c.pairs[c.winner]), L = C.map(c=>c.pairs[1-c.winner]);
   const next = [];
   for(let i=0;i<n;i++){
@@ -670,6 +701,7 @@ function advance(night){
     g.bLab = swaps===2 ? 'Subbed on' : 'Sub + gulag loser';
   }
   night.slam=null; night.leaveUndo=[];
+  if(n>1 && kotcOn(night, night.round+1)) crownCourt(next[0], night.log);
   night.courts = next; night.round++;
 }
 // Point slam: when the second sub spot would go to one of the pair who just lost in the gulag, they play each other for it (best of 3 points).
@@ -687,7 +719,7 @@ function nextPreview(){
   return {courts:N.courts.map((c,i)=>({name:courtName(i,N.courts.length), gul:N.courts.length>1&&i===N.courts.length-1, players:[...c.a,...c.b].map(p=>({p, mv:moveOf(before[p],after[p])}))})),
           bench:N.bench.map(p=>({p, mv:moveOf(before[p],after[p])}))};
 }
-function resetCourt(c, N){ c.pairs=null; c.face=null; c.score=null; c.winner=null; c.free = N.round===1 && !N.log.length; }
+function resetCourt(c, N){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.score=null; c.winner=null; c.free = N.round===1 && !N.log.length; }
 // Apply a leaver plus the ref's choice of replacement to night N (also used on a copy to preview the result).
 function applyLeave(N, p, choice){
   N.left.push(p);
@@ -757,6 +789,7 @@ function summaryData(date){
   const h=history().nights.find(x=>x.nt.date===date); if(!h) return null;
   const {nt, before, st}=h, r=rank(st), elo={...before};
   let upset=null; const per={}, streak={};
+  let reign=null; { let key=null, run=0, last=null; (nt.games||[]).filter(g=>g.court===0&&g.pairs&&g.winner!=null&&(g.courts||1)>1).sort((a,b)=>a.round-b.round).forEach(g=>{ const k=pairKey(g.pairs[g.winner]); run = k===key ? run+1 : 1; key=k; if(run>=2 && (!reign||run>reign.n)) reign={n:run, pair:g.pairs[g.winner]}; }); }
   (nt.games||[]).filter(g=>g.pairs&&g.winner!=null).slice().sort((x,y)=>x.round-y.round||x.court-y.court).forEach(g=>{
     const R=[avg(elo,g.pairs[0]),avg(elo,g.pairs[1])], E0=1/(1+Math.pow(10,(R[1]-R[0])/400)), Ew=g.winner===0?E0:1-E0;
     if(Ew<0.5 && (!upset||Ew<upset.e)) upset={e:Ew, g};
@@ -770,7 +803,7 @@ function summaryData(date){
   const winStreak = runners.length ? {n:bestRun, who:runners} : null;
   let gulag=null; Object.entries(per).forEach(([p,x])=>{ if(x.gul>0&&(!gulag||x.gul>gulag.n)) gulag={p,n:x.gul}; });
   const d=new Date(nt.date), when=d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
-  return {nt, when, venue:nt.venue&&VENUES[nt.venue]?VENUES[nt.venue].name:'', top:r.slice(0,3), upset, climber, winStreak, unbeaten, gulag};
+  return {nt, when, venue:nt.venue&&VENUES[nt.venue]?VENUES[nt.venue].name:'', top:r.slice(0,3), upset, climber, winStreak, unbeaten, gulag, reign};
 }
 const tm = pr => pr.join(' & ');
 const upsetLine = u => `${tm(u.g.pairs[u.g.winner])} beat ${tm(u.g.pairs[1-u.g.winner])}${u.g.score&&u.g.score[0]!=null&&u.g.score[1]!=null?` ${u.g.score[u.g.winner]}–${u.g.score[1-u.g.winner]}`:''} on ${courtName(u.g.court,u.g.courts||1)}`;
@@ -780,6 +813,7 @@ function summaryText(date){
   S.top.forEach((r,i)=>L.push(`${i+1}. ${r.name}: ${r.pts} pts (${r.w}–${r.g-r.w})`));
   if(S.upset) L.push('', `Biggest upset: ${upsetLine(S.upset)}`);
   if(S.climber) L.push(`Biggest climber: ${S.climber.p}, ${S.climber.from} → ${S.climber.to}`);
+  if(S.reign) L.push(`Longest reign on Tier 1: ${tm(S.reign.pair)} (${S.reign.n} in a row)`);
   if(S.winStreak) L.push(`Longest win streak: ${S.winStreak.who.join(', ')} (${S.winStreak.n} in a row)`);
   if(S.unbeaten.length) L.push(`Unbeaten: ${S.unbeaten.join(', ')}`);
   if(S.gulag) L.push(`Most time in the gulag: ${S.gulag.p} (${S.gulag.n} game${S.gulag.n>1?'s':''})`);
@@ -791,7 +825,7 @@ function summaryCard(date, heading){
   const fact=(k,v)=>`<div class="fact"><span>${k}</span><b>${v}</b></div>`;
   return `<div class="summary">${heading?`<div class="sum-head">${heading}</div>`:''}<div class="sum-when">${esc(S.when)}${S.venue?' · '+esc(S.venue):''}</div>
   <ol class="podium">${S.top.map((r,i)=>`<li class="p${i+1}"><span class="pl">${i+1}</span><b>${esc(r.name)}</b><span class="muted">${r.pts} pts · ${r.w}–${r.g-r.w}</span></li>`).join('')}</ol>
-  <div class="facts">${S.upset?fact('Biggest upset',esc(upsetLine(S.upset))):''}${S.climber?fact('Biggest climber',`${esc(S.climber.p)}, ${esc(S.climber.from)} → ${esc(S.climber.to)}`):''}${S.winStreak?fact('Longest win streak',`${esc(S.winStreak.who.join(', '))} (${S.winStreak.n} in a row)`):''}${S.unbeaten.length?fact('Unbeaten',esc(S.unbeaten.join(', '))):''}${S.gulag?fact('Most time in the gulag',`${esc(S.gulag.p)} (${S.gulag.n} game${S.gulag.n>1?'s':''})`):''}</div>
+  <div class="facts">${S.upset?fact('Biggest upset',esc(upsetLine(S.upset))):''}${S.climber?fact('Biggest climber',`${esc(S.climber.p)}, ${esc(S.climber.from)} → ${esc(S.climber.to)}`):''}${S.reign?fact('Longest reign on Tier 1',`${esc(tm(S.reign.pair))} (${S.reign.n} in a row)`):''}${S.winStreak?fact('Longest win streak',`${esc(S.winStreak.who.join(', '))} (${S.winStreak.n} in a row)`):''}${S.unbeaten.length?fact('Unbeaten',esc(S.unbeaten.join(', '))):''}${S.gulag?fact('Most time in the gulag',`${esc(S.gulag.p)} (${S.gulag.n} game${S.gulag.n>1?'s':''})`):''}</div>
   ${copyFallback===date?`<p class="muted">Press and hold the text below to copy it.</p><textarea class="copybox" id="copybox" readonly rows="10">${esc(summaryText(date))}</textarea>`:''}</div>`;
 }
 
@@ -902,6 +936,7 @@ function setupView(){
   <div class="row" style="justify-content:space-between"><span class="count ${missing?'bad':'ok'}">${filled} of ${need+s.subs}</span><span class="muted">${!s.venue?'Pick a venue':missing?`${missing} court spot${missing>1?'s':''} still empty`:'Ready to play'}</span></div>
   <div class="actions"><button class="btn primary" id="start" ${missing||!s.venue?'disabled':''}>Start the night</button>${filled?'<button class="btn" id="clear">Reset</button>':''}</div>`;
 }
+const crownSvg = () => `<svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15 1 4l6 5 5-8 5 8 6-5-1 11z"/><rect x="2" y="15.5" width="20" height="2.5" rx="1"/></svg>`;
 function courtView(c,i,n,ro){
   const g = n>1 && i===n-1, tag=courtTag(i,n);
   const st = !c.pairs ? '<span class="state">Pick partners</span>' : c.winner==null ? '<span class="state playing">Playing</span>' : '<span class="state">Done</span>';
@@ -911,15 +946,16 @@ function courtView(c,i,n,ro){
     body = `<div class="slots"><div class="slot"><div class="lab">${esc(c.aLab)}</div><b>${c.a.map(x=>pb(x,ro)).join('<br>')}</b></div><div class="slot"><div class="lab">${esc(c.bLab)}</div><b>${c.b.map(x=>pb(x,ro)).join('<br>')}</b></div></div>
     ${ro?'':`<div class="opts"><div class="lab">Or pick the teams yourself</div>${opts}</div>`}`;
   } else {
-    const upHint = i===0||n===1 ? 'Stays on Tier 1' : 'Levels up';
+    const upHint = i===0||n===1 ? (c.kotc ? 'Kings: stay together on Tier 1' : 'Stays on Tier 1') : 'Levels up';
     const downHint = g ? (night.bench.length?'Subbed off':'Stays in the gulag') : n===1 ? 'Stays on' : 'Drops a tier';
     body = c.pairs.map((pr,t)=>{
-      const won=c.winner===t, lost=c.winner===1-t, sc=c.score&&c.score[t];
-      return `<div class="team${won?' won':''}"><div class="tn"><b>${pr.map(x=>pb(x,ro)).join(' &amp; ')}</b><span class="hint">${won?upHint:lost?downHint:'Games won'}</span></div>
+      const won=c.winner===t, lost=c.winner===1-t, sc=c.score&&c.score[t], king=c.kotc&&c.kings&&pairKey(pr)===pairKey(c.kings), streak=king&&c.reign>=2;
+      const kHint = king ? `Kings${c.reign>=1?` · ${c.reign} win${c.reign>1?'s':''} in a row on Tier 1`:''}` : c.kotc ? 'Challengers' : 'Games won';
+      return `<div class="team${won?' won':''}${king?' king':''}${streak?' streak':''}"><div class="tn"><b>${king?crownSvg():''}${pr.map(x=>pb(x,ro)).join(' &amp; ')}</b><span class="hint">${won?(c.kotc&&!king?'New kings: stay together':upHint):lost?(king?'Dethroned: drop a tier':downHint):kHint}</span></div>
       ${ro?`<span class="g-score big">${sc!=null?sc:'–'}</span>`:`<div class="sc" role="group" aria-label="Games won by ${pr.map(esc).join(' and ')}">${[0,1,2,3].map(v=>`<button class="sv${sc===v?' on':''}" data-score="${i}:${t}:${v}" aria-pressed="${sc===v}">${v}</button>`).join('')}</div>`}</div>`;
-    }).join('') + `<div class="court-foot"><span class="muted">${c.winner!=null?`Final ${c.score[0]}–${c.score[1]}`:'First to 3 games'}</span>${ro||(c.score&&(c.score[0]!=null||c.score[1]!=null))?'':`<button class="btn sm" data-redraw="${i}">Change partners</button>`}</div>`;
+    }).join('') + `<div class="court-foot"><span class="muted">${c.winner!=null?`Final ${c.score[0]}–${c.score[1]}`:'First to 3 games'}</span>${ro||c.kotc||(c.score&&(c.score[0]!=null||c.score[1]!=null))?'':`<button class="btn sm" data-redraw="${i}">Change partners</button>`}</div>`;
   }
-  return `<section class="court${g?' gulag':''}"><div class="court-head"><span><span class="name">${courtName(i,n)}</span>${tag?`<span class="tag">${tag}</span>`:''}</span>${st}</div>${body}</section>`;
+  return `<section class="court${g?' gulag':''}${c.kotc?' kotc':''}${c.kotc&&c.reign>=2?' reign':''}"><div class="court-head"><span><span class="name">${courtName(i,n)}</span>${c.kotc?`<span class="tag">King of the court</span>`:tag?`<span class="tag">${tag}</span>`:''}</span>${st}</div>${body}</section>`;
 }
 /* ---------- earlier rounds tonight: view and fix scores ---------- */
 let viewRound=null, rDraft=null, rErr='';
@@ -1141,6 +1177,9 @@ function liveView(ro){
   ${!ro&&(night.leaveUndo||[]).length?(()=>{ const u=night.leaveUndo[night.leaveUndo.length-1];
     return confirming==='leaveundo' ? `<div class="confirm"><p>Give ${esc(u.p)} their spot back? Scores or changes made since they left will be cleared.</p><div class="row"><button class="btn danger" id="leave-undo-yes">Undo ${esc(u.p)} leaving</button><button class="btn" id="end-no">Cancel</button></div></div>`
       : `<div class="leave-undo"><span><b>${esc(u.p)}</b> marked as left early.</span><button class="btn sm primary" id="leave-undo">Undo</button></div>`; })():''}
+  ${n>1?(()=>{ const nowOn = night.kotc===true || (night.kotc!==false && night.round>=3), willOn = kotcOn(night, night.round+1), auto = night.kotc!==true && night.kotc!==false;
+    const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn ? (night.round===1?'On from round 2':'On from next round') : auto&&night.round<3 ? 'Starts round 3' : 'Off';
+    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${auto?' (auto)':''}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
@@ -1375,6 +1414,10 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='draw') openFlip();
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
+  else if(t.id==='kotc-toggle'){ const on = !(night.kotc===true || (night.kotc!==false && night.round>=3));
+    night.kotc = on; const c=night.courts[0];
+    if(c && night.courts.length>1 && night.round>=2 && !(c.score&&(c.score[0]!=null||c.score[1]!=null))){ if(on && !c.kotc) crownCourt(c, night.log); else if(!on && c.kotc){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.aLab='Won Tier 1, stayed'; c.bLab='Won, came up'; } }
+    logChange(`King of the court switched ${on?'on':'off'} in round ${night.round}`); saveNight(); render(); }
   else if(t.id==='lmlock'){ if(authApi) authApi.signOut(); renaming=null; confirming=null; editNight=null; draft=null; tab='seed'; render(); }
   else if(d.amode){ authMode=d.amode; authMsg=null; render(); const i=$('#auth-email'); if(i) i.focus(); }
   else if(t.id==='auth-diag'){ diagMsg='Checking…'; render(); const L=[];
