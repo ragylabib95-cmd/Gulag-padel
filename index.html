@@ -422,6 +422,27 @@ summary{cursor:pointer;font-weight:600}
 }
 @keyframes crownBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-3px) rotate(4deg)}}
 @keyframes reignGlow{0%,100%{box-shadow:0 0 0 2px #e9b44c, 0 0 10px rgba(233,180,76,.3)}50%{box-shadow:0 0 0 2px #e9b44c, 0 0 24px rgba(233,180,76,.65)}}
+.ann{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.ann-top{background:var(--court);color:var(--court-fg);padding:18px 16px 16px;display:flex;flex-direction:column;gap:4px}
+.ann-eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;opacity:.85;font-weight:600}
+.ann-title{margin:0;color:var(--court-fg);font-size:28px}
+.ann-head{margin:4px 0 0;font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.02em;color:var(--ball);text-transform:uppercase}
+.ann-facts{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.ann-facts div{background:var(--surface);padding:10px 16px;display:flex;flex-direction:column;gap:2px}
+.ann-facts span{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.ann-facts b{font-size:16px}
+.ann-spots{margin:12px 16px 0;font-weight:700;color:var(--win)}
+.ann-spots.full{color:var(--gulag)}
+.ann-list{margin:8px 0 0;padding:4px 16px 14px 44px;columns:2;column-gap:24px}
+.ann-list li{padding:5px 0;font-family:var(--display);font-weight:700;font-size:18px;break-inside:avoid}
+.ann-list li::marker{color:var(--muted);font-size:14px}
+@media (max-width:360px){.ann-list{columns:1}}
+.ann .muted{margin:0 16px 14px}
+.tagx.warn{background:var(--gulag-soft);color:var(--gulag);margin-left:6px}
+.ann-form label{display:flex;flex-direction:column;gap:4px}
+.ann-chip{display:inline-flex;align-items:center;gap:4px;padding-right:2px}
+.ann-chip .x{font-size:16px;padding:0 4px}
+.ann-fill{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ball);border-radius:8px;padding:10px 12px;margin-bottom:14px}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
@@ -481,6 +502,7 @@ summary{cursor:pointer;font-weight:600}
 </div></div>
 <div class="wrap">
   <nav role="tablist">
+    <button role="tab" data-tab="ann" aria-selected="false" hidden>Announcement</button>
     <button role="tab" data-tab="seed" aria-selected="true">Seeding</button>
     <button role="tab" data-tab="night" aria-selected="false">Tonight</button>
     <button role="tab" data-tab="history" aria-selected="false">History</button>
@@ -783,6 +805,72 @@ async function endNight(){
   { const v=night.setup.venue; night = blankNight(night.setup.courts, night.setup.subs); night.setup.venue=v; } confirming=null; saveNight(); render(); window.scrollTo(0,0);
 }
 
+/* ---------- announcements (roster posts) ---------- */
+// The first roster is built in so it shows before the league manager has opened LM Tools; later ones live in settings.announcements.
+const BUILTIN_ANN = { id:'ann-2026-10-27', title:'Padel Tuesday 27/10', headline:'‼️‼️ BACK TO RECESS ‼️‼️', venue:'recess', courts:4, time:'7:30–10:00pm', max:18,
+  start:'2026-10-27T19:30:00+11:00', from:'2026-10-26T00:00:00+11:00',
+  players:['R. Labib','Jayme','K. Labib','Anthony R','James A','Josh. H','James. S','C. Zayed','Mena. A','Jordy','Ziza','D. Abdelmalek','Marcus','Peter. A','N. Maprock','Lukas','Jono. G'] };
+let annDraft=null, annEditId=null, userPickedTab=false;
+function allAnns(){ const A=(settings.announcements||[]).slice(); const gone=settings.annRemoved||[]; if(!A.some(a=>a.id===BUILTIN_ANN.id) && !gone.includes(BUILTIN_ANN.id)) A.push(BUILTIN_ANN); return A.sort((a,b)=>T(a.start)-T(b.start)); }
+const annFrom = a => a.from || new Date(Date.parse(a.start)-24*3600*1000).toISOString();
+const T = iso => Date.parse(iso); // compare times as numbers: stored dates mix time-zone formats
+// the roster for tonight's setup: showing now, or a game that started in the last 6 hours
+function lastAnn(){ const now=Date.now(); return allAnns().filter(a=>T(annFrom(a))<=now && now<T(a.start)+6*3600*1000).pop() || null; }
+function activeAnn(){ const now=Date.now(); return allAnns().find(a=>T(annFrom(a))<=now && now<T(a.start)) || null; }
+// match a typed name to the player list (exact, then ignoring dots, spaces and case)
+const normName = n => String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+function resolveName(n){ const K=knownNames(); if(K.includes(n)) return n; const k=normName(n); return K.find(x=>normName(x)===k) || null; }
+const annWhen = a => { const d=new Date(a.start); return d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); };
+function annView(){
+  const a=activeAnn(); if(!a) return seedView();
+  const ps=a.players||[], left=Math.max(0,(a.max||0)-ps.length);
+  return `<article class="ann">
+    <div class="ann-top"><span class="ann-eyebrow">Next game · ${esc(annWhen(a))}</span><h2 class="ann-title">${esc(a.title||'Padel')}</h2>${a.headline?`<p class="ann-head">${esc(a.headline)}</p>`:''}</div>
+    <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
+    ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
+    <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${nm(r||p)}</span>${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
+    ${unlocked?`<p class="muted">Shown until the game starts, then the site opens on Seeding again. Edit it in LM Tools → Announcements.</p>`:''}
+  </article>`;
+}
+function annForm(){
+  const D=annDraft;
+  return `<div class="ann-form"><div class="lm-grid"><label>Match day and start time<input id="ann-start" type="datetime-local" value="${esc(D.startLocal||'')}"></label><label>Finish time<input id="ann-end" type="time" value="${esc(D.end||'22:00')}"></label>
+    <label>Venue<select id="ann-venue">${Object.entries(VENUES).map(([k,v])=>`<option value="${k}"${D.venue===k?' selected':''}>${v.name}</option>`).join('')}</select></label>
+    <label>Courts<input id="ann-courts" type="number" min="1" max="8" value="${D.courts}"></label><label>Max players<input id="ann-max" type="number" min="4" max="40" value="${D.max}"></label>
+    <label>Post it<select id="ann-when"><option value="24h"${D.when==='24h'?' selected':''}>24 hours before the game</option><option value="now"${D.when==='now'?' selected':''}>Straight away</option></select></label></div>
+    <label style="margin-top:8px">Headline (optional)<input id="ann-headline" value="${esc(D.headline||'')}" placeholder="e.g. Back to Recess"></label>
+    <label style="margin-top:8px">Players (${D.players.length}${D.max?` / ${D.max}`:''})</label>
+    <form class="row" id="annaddform"><input id="ann-p" autocomplete="off" placeholder="Type a player’s name" style="flex:1;min-width:0"><button class="btn sm" type="submit">Add</button></form>
+    <div class="chips" style="margin-top:8px">${D.players.map((p,i)=>`<span class="chip on ann-chip">${i+1}. ${esc(p)}<button class="x" data-annrm="${i}" aria-label="Remove ${esc(p)}">×</button></span>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="ann-save">${annEditId?'Save changes':'Schedule roster'}</button><button class="btn" id="ann-cancel">Cancel</button></div>${note('ann')}</div>`;
+}
+function annSection(){
+  const now=Date.now(), A=allAnns().slice().reverse();
+  const status=a=> now>=T(a.start) ? 'Finished' : now>=T(annFrom(a)) ? 'Showing now' : `Shows from ${new Date(annFrom(a)).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}`;
+  return `<p class="muted">Post the roster for the next game. While it’s showing, the site opens on the Announcement tab for everyone; at the start time it disappears and the site opens on Seeding again.</p>
+    ${annDraft?annForm():`<button class="btn primary" id="ann-new">New roster</button>`}
+    ${A.length?`<ul class="lm-list" style="margin-top:10px">${A.map(a=>`<li class="lm-row"><span class="lm-name">${esc(a.title||'Padel')}<span class="lm-sub">${esc(annWhen(a))} · ${(a.players||[]).length} players · ${esc(status(a))}</span></span><span class="lm-act"><button class="btn sm" data-annedit="${esc(a.id)}">Edit</button>${confirming==='annrm:'+a.id?`<button class="btn sm danger" data-annrmyes="${esc(a.id)}">Confirm delete</button>`:`<button class="btn sm danger" data-anndel="${esc(a.id)}">Delete</button>`}</span></li>`).join('')}</ul>`:''}`;
+}
+const pad2 = n => String(n).padStart(2,'0');
+const toLocalInput = iso => { const d=new Date(iso); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+function readAnnForm(){ const D=annDraft; if(!D) return; const g=id=>$('#'+id); if(!g('ann-start')) return;
+  D.startLocal=g('ann-start').value; D.end=g('ann-end').value; D.venue=g('ann-venue').value; D.courts=+g('ann-courts').value||4; D.max=+g('ann-max').value||0; D.when=g('ann-when').value; D.headline=g('ann-headline').value.trim(); }
+function saveAnn(){
+  readAnnForm(); const D=annDraft;
+  if(!D.startLocal){ lmMsg.ann={t:'Pick the match day and start time.',err:true}; render(); return; }
+  if(!D.players.length){ lmMsg.ann={t:'Add at least one player.',err:true}; render(); return; }
+  const start=new Date(D.startLocal), endT=D.end;
+  const fmtT = d => d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}).replace(/\s/g,'').toLowerCase();
+  const endD = endT ? new Date(`${D.startLocal.slice(0,10)}T${endT}`) : null;
+  const a={ id: annEditId || ('ann-'+Date.now()), title:`Padel ${start.toLocaleDateString(undefined,{weekday:'long'})} ${start.getDate()}/${start.getMonth()+1}`, headline:D.headline, venue:D.venue, courts:D.courts, max:D.max,
+    time:`${fmtT(start)}${endD?'–'+fmtT(endD):''}`, start:start.toISOString(), from: D.when==='now' ? new Date().toISOString() : new Date(start.getTime()-24*3600*1000).toISOString(), players:D.players.slice() };
+  settings.announcements=[...(settings.announcements||[]).filter(x=>x.id!==a.id), a]; saveSettings();
+  logChange(`${annEditId?'Updated':'Scheduled'} the roster for ${annWhen(a)} (${a.players.length} players)`);
+  annDraft=null; annEditId=null; lmMsg.ann=null; render();
+}
+// keep the Announcement tab in step with the clock while the page is open
+setInterval(()=>{ const has=!!activeAnn(); if(tab==='ann' && !has){ tab='seed'; render(); } else { const b=document.querySelector('nav [data-tab="ann"]'); if(b && b.hidden===has) render(); } }, 30000);
+
 /* ---------- night summary ---------- */
 let justEnded=null, sumOpen=null, copied=null, copyFallback=null;
 function summaryData(date){
@@ -899,12 +987,13 @@ const AUTH_ERR = {'auth/invalid-credential':'That email and password don’t mat
 function lockView(){ return `<h2>Tonight</h2><div class="banner">No night is running right now. A ref or the league manager sets up the night.</div>${refForm()}`; }
 function render(){
   refreshSeeds(); refreshLive();
+  { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann'; }
   const v = night.phase==='live' ? night.venue : night.setup.venue;
   document.documentElement.dataset.venue = tab==='night' && v ? v : (night.phase==='live' && night.venue) ? night.venue : 'recess';
   const shown = (tab==='night' && v) || (night.phase==='live' && night.venue);
   $('#venue-name').textContent = shown && VENUES[shown] ? VENUES[shown].name : '';
   document.querySelectorAll('nav button').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===tab));
-  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? liveView(!ref) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
+  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? liveView(!ref) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
 }
 const pts = n => `<span class="pts">${n}</span>`;
 function rankTable(rows, opts={}){
@@ -925,6 +1014,7 @@ function setupView(){
   }).join('');
   return `
   ${justEnded?`<div class="saved-night">${summaryCard(justEnded,'Night saved')}<button class="btn sm" id="sum-dismiss">Done</button></div>`:''}
+  ${(()=>{ const a=lastAnn(); return a?`<div class="ann-fill"><span><b>${esc(a.title||'Roster')}</b><span class="muted"> · ${(a.players||[]).length} players</span></span><button class="btn sm primary" id="ann-fill">Fill from roster</button></div>`:''; })()}
   <h2>Where are you playing?</h2>
   <div class="venues" role="radiogroup" aria-label="Venue">${Object.entries(VENUES).map(([k,v])=>`<button class="venue${s.venue===k?' on':''}" role="radio" aria-checked="${s.venue===k}" data-venue="${k}"><b>${v.name}</b></button>`).join('')}</div>
   <h2>Set up tonight</h2>
@@ -1062,6 +1152,7 @@ function lmView(){
   const L=changelog.slice(0, showAllLog?300:30);
   const log = changelog.length ? `<ul class="log">${L.map(x=>`<li><span class="muted">${esc(fmtWhen(x.at))}${x.by?` · <b class="who">${esc(x.by)}</b>`:''}</span>${esc(x.what)}</li>`).join('')}</ul>${changelog.length>30?`<button class="btn sm" id="log-more">${showAllLog?'Show fewer':`Show all ${changelog.length}`}</button>`:''}` : '<p class="muted">Nothing changed yet. Score edits, deleted nights, renames, merges, removals and settings changes appear here.</p>';
   return `<div class="row" style="justify-content:space-between;align-items:center"><h2>LM Tools</h2><button class="btn sm" id="lmlock">Lock</button></div>
+  ${LMSEC('ann','Announcements',annSection(), activeAnn()?'Showing now':'')}
   ${LMSEC('players',`Players (${names.length})`,players)}
   ${LMSEC('merge','Merge duplicates',merge)}
   ${LMSEC('bulk','Add players in bulk',bulk)}
@@ -1313,7 +1404,7 @@ async function saveEdit(){
 
 /* ---------- events ---------- */
 $('#acct').addEventListener('click', ()=>{ if(tab!=='acct') backTab=tab; tab='acct'; authMsg=null; authMode='signin'; render(); window.scrollTo(0,0); });
-document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){ tab=b.dataset.tab; confirming=null; editNames=false; renaming=null; render(); } });
+document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){ userPickedTab=true; tab=b.dataset.tab; confirming=null; editNames=false; renaming=null; render(); } });
 $('#main').addEventListener('submit', async e=>{
   e.preventDefault();
   if(e.target.id==='newpform'){ const v=$('#newp').value.trim().replace(/\s+/g,' '); if(!v) return;
@@ -1321,6 +1412,9 @@ $('#main').addEventListener('submit', async e=>{
     if(!roster.includes(name)){ roster.push(name); saveRoster(); logChange(`Added new player ${name} (Add button in setup)`, 'name'); addNote=`${name} added. Tap their name above to put them in tonight’s list.`; }
     else addNote=`${name} is already in the list above.`;
     justAdded=name; render(); const i=$('#newp'); if(i) i.focus(); return; }
+  if(e.target.id==='annaddform'){ readAnnForm(); const v=$('#ann-p').value.trim().replace(/\s+/g,' '); if(!v) return; const n=resolveName(v)||v;
+    if(annDraft.players.some(x=>normName(x)===normName(n))) lmMsg.ann={t:`${n} is already on the roster.`,err:true}; else { annDraft.players.push(n); lmMsg.ann = resolveName(v)?null:{t:`${n} isn’t in the player list yet. They’ll be added when the night is set up.`}; }
+    render(); const i=$('#ann-p'); if(i) i.focus(); return; }
   if(e.target.id==='refpassform'){ const v=$('#refpass').value, nmv=$('#refname').value.trim().replace(/\s+/g,' ');
     if(!nmv){ refErr='Add your name first.'; render(); const i=$('#refname'); if(i) i.focus(); return; }
     if(!v) return; authBusy=true; refErr=''; refName=nmv; render();
@@ -1414,6 +1508,14 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='draw') openFlip();
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
+  else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
+  else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
+  else if(t.id==='ann-cancel'){ annDraft=null; annEditId=null; lmMsg.ann=null; render(); }
+  else if(t.id==='ann-save') saveAnn();
+  else if(d.annrm!=null){ readAnnForm(); annDraft.players.splice(+d.annrm,1); render(); }
+  else if(d.anndel!=null){ confirming='annrm:'+d.anndel; render(); }
+  else if(d.annrmyes!=null){ const id=d.annrmyes, a=allAnns().find(x=>x.id===id); settings.announcements=(settings.announcements||[]).filter(x=>x.id!==id); if(id===BUILTIN_ANN.id) settings.annRemoved=[...(settings.annRemoved||[]), id]; saveSettings(); logChange(`Deleted the roster for ${a?annWhen(a):id}`); confirming=null; render(); }
+  else if(t.id==='ann-fill'){ const a=lastAnn(); if(a){ const names=(a.players||[]).map(p=>resolveName(p)||p); night.setup.names=names.slice(); night.setup.courts=Math.max(1,Math.min(MAXC,a.courts||night.setup.courts)); night.setup.subs=Math.max(0,Math.min(MAXS,names.length-night.setup.courts*4)); if(a.venue) night.setup.venue=a.venue; names.forEach(n=>{ if(!roster.includes(n)){ roster.push(n); } }); saveRoster(); saveNight(); render(); } }
   else if(t.id==='kotc-toggle'){ const on = !(night.kotc===true || (night.kotc!==false && night.round>=3));
     night.kotc = on; const c=night.courts[0];
     if(c && night.courts.length>1 && night.round>=2 && !(c.score&&(c.score[0]!=null||c.score[1]!=null))){ if(on && !c.kotc) crownCourt(c, night.log); else if(!on && c.kotc){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.aLab='Won Tier 1, stayed'; c.bLab='Won, came up'; } }
@@ -1529,7 +1631,7 @@ function hideSug(){ if(sugBox){ const h=sugBox.parentElement; sugBox.remove(); s
 function showSug(input){
   hideSug();
   const used = input.dataset.name!=null ? setupNames().filter((n,i)=>i!==+input.dataset.name) : input.id==='newp' ? setupNames() : [];
-  const list = input.id==='refname' ? (()=>{ const q=input.value.trim().toLowerCase(), R=regulars(); return (q ? R.filter(n=>n.toLowerCase().split(/[\s.\-]+/).some(w=>w.startsWith(q))||n.toLowerCase().startsWith(q)) : R).filter(n=>n.toLowerCase()!==q).slice(0,6); })() : matchNames(input.value, used);
+  const list = input.id==='ann-p' ? (()=>{ const q=input.value.trim().toLowerCase(); if(!q) return []; return knownNames().filter(n=>!isInactive(n)&&!annDraft.players.includes(n)&&(n.toLowerCase().startsWith(q)||n.toLowerCase().split(/[\s.\-]+/).some(w=>w.startsWith(q)))).sort((a,b)=>a.localeCompare(b)).slice(0,6); })() : input.id==='refname' ? (()=>{ const q=input.value.trim().toLowerCase(), R=regulars(); return (q ? R.filter(n=>n.toLowerCase().split(/[\s.\-]+/).some(w=>w.startsWith(q))||n.toLowerCase().startsWith(q)) : R).filter(n=>n.toLowerCase()!==q).slice(0,6); })() : matchNames(input.value, used);
   if(!list.length) return;
   sugBox=document.createElement('div'); sugBox.className='suggest'; sugBox.setAttribute('role','listbox');
   sugBox.innerHTML=list.map(n=>`<button type="button" role="option" data-sug="${esc(n)}">${esc(n)}</button>`).join('');
@@ -1541,10 +1643,11 @@ function pickSug(input, name){
   if(!sugBox) return; hideSug();
   if(input.dataset.name!=null){ const i=+input.dataset.name; night.setup.names[i]=name; saveNight(); render();
     const nx=setupNames().findIndex(n=>!n); const f=nx>=0?$('#name-'+nx):null; if(f) f.focus(); }
+  else if(input.id==='ann-p'){ input.value=name; input.form.requestSubmit(); }
   else if(input.id==='newp'){ input.value=name; input.form.requestSubmit(); }
   else { input.value=name; input.dispatchEvent(new Event('change',{bubbles:true})); input.focus(); }
 }
-$('#main').addEventListener('input', e=>{ const t=e.target; if(t.dataset.name!=null || t.dataset.mn!=null || t.id==='newp' || t.id==='latep' || t.id==='refname') showSug(t); });
+$('#main').addEventListener('input', e=>{ const t=e.target; if(t.dataset.name!=null || t.dataset.mn!=null || t.id==='newp' || t.id==='latep' || t.id==='refname' || t.id==='ann-p') showSug(t); });
 $('#main').addEventListener('focusin', e=>{ if(e.target.id==='refname') showSug(e.target); });
 // LM sections remember which are open across re-renders
 $('#main').addEventListener('click', e=>{ const sm=e.target.closest('details[data-lm] > summary'); if(sm){ const dt=sm.parentElement, k=dt.dataset.lm; setTimeout(()=>{ dt.open?lmOpen.add(k):lmOpen.delete(k); },0); } });
@@ -1604,7 +1707,7 @@ lsLoad(); render();
     applyRoles(); if(!typing()) render(); });
   setStatus('Live');
   const lost = ()=>setStatus('Lost connection. Reload the page', true);
-  db.doc('club/settings').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/settings')) return; settings = s.exists ? JSON.parse(JSON.stringify(s.data())) : {}; if(!typing()) render(); }, ()=>{});
+  db.doc('club/settings').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/settings')) return; settings = s.exists ? JSON.parse(JSON.stringify(s.data())) : {}; if(!userPickedTab && tab==='seed' && activeAnn()) tab='ann'; if(!typing()) render(); }, ()=>{});
   db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
   db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
   db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
