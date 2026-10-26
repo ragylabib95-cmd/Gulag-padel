@@ -482,6 +482,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 @keyframes splashIn{to{opacity:1;transform:none}}
 @keyframes splashBar{to{width:min(160px,40vw)}}
 #splash .splash-quote{font-family:"Outfit","Helvetica Neue",Arial,sans-serif;font-weight:300;font-style:italic;font-size:clamp(14px,3.8vw,17px);letter-spacing:.04em;color:rgba(255,255,255,.85);text-align:center;opacity:0;transform:translateY(4px);animation:splashQuote 1.4s ease 2.5s forwards}
+#splash .splash-by{display:block;margin-top:6px;font-style:normal;font-size:.8em;letter-spacing:.12em;opacity:.8}
 @keyframes splashQuote{to{opacity:1;transform:none}}
 @keyframes splashFade{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){#splash .splash-mark,#splash .splash-tag,#splash .splash-quote{animation-duration:.3s;animation-delay:0s;transform:none}#splash .splash-bar{animation:none;width:min(160px,40vw)}}
@@ -500,11 +501,16 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true"><div class="splash-in"><div class="splash-mark"><span class="s-gulag">GULAG</span><span class="s-padel"><svg viewBox="0 0 40 56" aria-hidden="true"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></div><div class="splash-bar"></div><div class="splash-quote">“Don’t get stuck in the gulag”</div></div></div>
+<div id="splash" aria-hidden="true"><div class="splash-in"><div class="splash-mark"><span class="s-gulag">GULAG</span><span class="s-padel"><svg viewBox="0 0 40 56" aria-hidden="true"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></div><div class="splash-bar"></div><div class="splash-quote" id="splash-quote">“Don’t get stuck in the gulag”</div></div></div>
 <script>
 /* Splash: shown once per visit. Hidden as soon as the seeding has loaded and the logo has had its moment. */
 (function(){ var el=document.getElementById('splash'), seen=false;
   /* plays on every load; tap to skip */
+  /* a random quote each time */
+  var Q=[["Don’t get stuck in the gulag"],["May the flip be in your favour"],["Was it actually out?"],["Clip that"],["Be a good guy, check your beem"],["يا ابن المتناكة","Peter"]],
+      q=Q[Math.floor(Math.random()*Q.length)], qe=document.getElementById('splash-quote');
+  if(qe){ qe.textContent=''; var t=document.createElement('span'); t.setAttribute('dir','auto'); t.textContent='“'+q[0]+'”'; qe.appendChild(t);
+    if(q[1]){ var by=document.createElement('span'); by.className='splash-by'; by.textContent='— '+q[1]; qe.appendChild(by); } }
   var t0=Date.now(), quick=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches, MIN=quick?1200:5000, MAX=9000, done=false;
   function hide(){ if(done) return; done=true; var wait=Math.max(0,MIN-(Date.now()-t0)); setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },700); },wait); }
   window.__splashReady=hide; setTimeout(hide,MAX);
