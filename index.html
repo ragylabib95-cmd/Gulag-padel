@@ -443,6 +443,12 @@ summary{cursor:pointer;font-weight:600}
 .ann-chip{display:inline-flex;align-items:center;gap:4px;padding-right:2px}
 .ann-chip .x{font-size:16px;padding:0 4px}
 .ann-fill{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ball);border-radius:8px;padding:10px 12px;margin-bottom:14px}
+.early-start{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ball);border-radius:8px;padding:12px;margin:10px 0}
+.early-start p{margin:0 0 10px}
+.late-banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--court);border-radius:8px;padding:10px 12px;margin:0 0 12px}
+.late-banner p{margin:0}
+.late-banner.ready{border-left-color:var(--ball)}
+.late-banner.ready p{margin:0 0 10px}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--court);text-decoration:underline;cursor:pointer}
 .refbox label{margin-top:2px}
 .auth-links{margin-top:6px}
@@ -666,9 +672,13 @@ const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.flo
 const setupNames = () => { const s=night.setup; return Array.from({length:s.courts*4+s.subs}, (_,i)=> (s.names[i]||'').trim()); };
 const freshCourt = (p, lab='Drawn') => ({a:[p[0],p[1]], b:[p[2],p[3]], aLab:lab, bLab:lab, free:true, pairs:null, face:null, score:null, winner:null});
 
-function startNight(){
-  const s=night.setup, names=setupNames(), k=s.courts;
-  if(names.slice(0,k*4).some(n=>!n) || !s.venue) return;
+function startNight(partial){
+  const s=night.setup, all=setupNames(), here=all.filter(Boolean);
+  const k = partial ? Math.min(s.courts, Math.floor(here.length/4)) : s.courts;
+  if(!s.venue || k<1) return;
+  if(!partial && all.slice(0,k*4).some(n=>!n)) return;
+  const names = partial ? here : all;
+  night.planned = s.courts;
   night.venue = s.venue;
   names.filter(Boolean).forEach(p=>{ if(!roster.includes(p)) roster.push(p); }); saveRoster();
   night.arrivals = names.filter(Boolean); night.left=[];
@@ -787,7 +797,7 @@ function leaveOptions(p){
     return {...o, title, moves, restarts, breaks:n1<n0};
   });
 }
-function addCourtFromSubs(){ night.courts.push(freshCourt(night.bench.splice(0,4),'Off the subs bench')); saveNight(); render(); }
+function addCourtFromSubs(){ const four=night.bench.splice(0,4); night.courts.push(freshCourt(four,'Arrived late')); logChange(`Opened court ${night.courts.length} for ${four.join(', ')}`); saveNight(); render(); window.scrollTo(0,0); }
 function setScore(c, t, v){
   c.score = c.score || [null,null];
   c.score[t] = c.score[t]===v ? null : v;
@@ -1024,6 +1034,7 @@ function setupView(){
   <form class="row newp" id="newpform"><input id="newp" autocomplete="off" placeholder="New player name" aria-label="New player name"><button class="btn sm primary" type="submit">Add</button></form>${addNote?`<p class="muted add-note">${esc(addNote)}</p>`:''}</div>
   <div class="arrivals">${rows}</div>
   <div class="row" style="justify-content:space-between"><span class="count ${missing?'bad':'ok'}">${filled} of ${need+s.subs}</span><span class="muted">${!s.venue?'Pick a venue':missing?`${missing} court spot${missing>1?'s':''} still empty`:'Ready to play'}</span></div>
+  ${(()=>{ const can=Math.min(k,Math.floor(filled/4)); return missing&&s.venue&&can>=1 ? `<div class="early-start"><p><b>Not everyone’s here yet?</b> Start with the ${filled} who are. ${can===1?'They play on 1 court':`They fill the top ${can} courts`}${filled-can*4?` and ${filled-can*4} wait${filled-can*4===1?'s':''} as a sub`:''}. Add latecomers as late arrivals; once 4 are waiting you can open the next court.</p><button class="btn primary" id="start-partial">Start with ${can} court${can>1?'s':''} now</button></div>` : ''; })()}
   <div class="actions"><button class="btn primary" id="start" ${missing||!s.venue?'disabled':''}>Start the night</button>${filled?'<button class="btn" id="clear">Reset</button>':''}</div>`;
 }
 const crownSvg = () => `<svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15 1 4l6 5 5-8 5 8 6-5-1 11z"/><rect x="2" y="15.5" width="20" height="2.5" rx="1"/></svg>`;
@@ -1274,7 +1285,10 @@ function liveView(ro){
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
-  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&night.bench.length>=4?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
+  ${!ro && night.planned && n<night.planned ? (night.bench.length>=4
+    ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button></div>`
+    : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Add latecomers as late arrivals below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
+  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
   ${!ro&&done?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round</button>`}</div>`:''}
   ${ro?'':`<form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Late arrival" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form>`}
@@ -1505,6 +1519,7 @@ $('#main').addEventListener('click', async e=>{
     saveNight(); render(); }
   else if(t.id==='clear'){ night.setup.names=[]; saveNight(); render(); }
   else if(t.id==='start') startNight();
+  else if(t.id==='start-partial') startNight(true);
   else if(t.id==='draw') openFlip();
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
