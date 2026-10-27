@@ -507,7 +507,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 (function(){ var el=document.getElementById('splash'), seen=false;
   /* plays on every load; tap to skip */
   /* a random quote each time */
-  var Q=[["Don’t get stuck in the gulag"],["May the flip be in your favour"],["Was it actually out?"],["Clip that"],["Be a good guy, check your beem"],["يا ابن المتناكة"]],
+  var Q=[["Don’t get stuck in the gulag"],["May the flip be in your favour"],["Was it actually out?"],["Clip that"],["Be a good guy, check your beem"],["Let’s bring back bullying, especially in the gulag"],["يا ابن المتناكة"]],
       q=Q[Math.floor(Math.random()*Q.length)], qe=document.getElementById('splash-quote');
   if(qe){ qe.textContent=''; var t=document.createElement('span'); t.setAttribute('dir','auto'); t.textContent='“'+q[0]+'”'; qe.appendChild(t);
     if(q[1]){ var by=document.createElement('span'); by.className='splash-by'; by.textContent='— '+q[1]; qe.appendChild(by); } }
