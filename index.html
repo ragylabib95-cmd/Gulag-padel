@@ -542,6 +542,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
       <li>Win on Tier 1 and you stay on the court.</li>
       <li>Lose in the gulag and you’re subbed off with your teammate.</li>
       <li>King of the court (trial): from round 3 the pair that wins Tier 1 stays together as the kings until they lose. The Tier 2 winners come up as a pair to challenge them. A ref can switch it on or off any round.</li>
+      <li>Losing in the gulag costs points in the seeding (from round 2 on).</li>
       <li>With 3 subs, the pair who just lost in the gulag play a best-of-3 point slam while they sit out. The winner takes the second sub spot next round.</li>
       <li>After every game you face your old teammate: whether you went up, came down, stayed on Tier 1 or subbed back on. Flip the racket or pick the teams yourself; either way you partner someone from the other pair.</li>
       <li>Games are first to 3. Scores feed tonight’s ranking and the overall seedings.</li>
@@ -587,7 +588,7 @@ let tab = 'seed', roster = [], night = blankNight(), nights = [], db = null, con
 function setStatus(t, err){ const s=$('#status'); s.textContent=t; s.className='status'+(err?' err':''); }
 function fix(n){ n=n||blankNight(); if(!n.setup) n.setup={courts:3,subs:0,names:[]}; if(!n.left) n.left=[]; return n; }
 let settings={}, changelog=[];
-const DEFAULTS={win:10, tier:2, upset:10, carry:5, fullWeeks:10, halfWeeks:20, seedBadges:6, liveBadges:4};
+const DEFAULTS={win:10, tier:2, upset:10, carry:5, gulagLoss:3, fullWeeks:10, halfWeeks:20, seedBadges:6, liveBadges:4};
 const S = k => settings.rules && settings.rules[k]!=null ? settings.rules[k] : DEFAULTS[k];
 const isInactive = p => (settings.inactive||[]).includes(p);
 function currentSeason(){ const c=(settings.seasons&&settings.seasons.current)||{}; return {name:c.name||'Season 1', start:c.start||null, end:null}; }
@@ -649,9 +650,12 @@ function playGames(games, elo, stats){
         // carry bonus: winning with a partner rated well below you (full bonus at a 250+ rating gap, nothing under 50)
         const mate=g.pairs[t].find(x=>x!==p), gap=rate(elo,p)-rate(elo,mate), cb=Math.round(S('carry')*Math.min(1,Math.max(0,(gap-50)/200)));
         if(cb>0){ s.pts+=cb; s.carry=(s.carry||0)+cb; } }
+      // gulag penalty: losing in the gulag costs points (not in round 1, where the gulag is set by arrival order)
+      else if((g.courts||1)>1 && g.court===(g.courts||1)-1 && g.round>1){ s.pts -= S('gulagLoss'); s.gpen=(s.gpen||0)+S('gulagLoss'); }
     }));
     [0,1].forEach(t=> g.pairs[t].forEach(p=> elo[p]=rate(elo,p)+delta[t]));
   });
+  Object.values(st).forEach(x=>{ if(x.pts<0) x.pts=0; }); // nobody finishes a night below zero
   return st;
 }
 const rank = st => Object.values(st).sort((x,y)=> y.pts-x.pts || y.w-x.w || (y.gw-y.gl)-(x.gw-x.gl) || x.name.localeCompare(y.name));
@@ -1187,7 +1191,7 @@ function lmView(){
     ${M.games.map(mgame).join('')}<div class="row"><button class="btn" id="m-add">Add game</button><button class="btn primary" id="m-save">Save night</button><button class="btn" id="m-clear">Clear</button></div>${note('manual')}`;
   // 8. seeding settings
   const num=(k,label,min,max)=>`<label>${label}<input data-rule="${k}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${S(k)}"></label>`;
-  const rules = `<p class="muted">Changes apply to every saved night straight away.</p><div class="lm-grid">${num('win','Points for a win',0,50)}${num('tier','Bonus per tier above the gulag',0,20)}${num('upset','Top upset bonus',0,30)}${num('carry','Top carry bonus',0,30)}${num('fullWeeks','Weeks that count in full',1,52)}${num('halfWeeks','Weeks that count half (total)',1,104)}${num('seedBadges','Seed (x) badges for top',0,20)}${num('liveBadges','Tonight’s live (x) for top',0,20)}</div>
+  const rules = `<p class="muted">Changes apply to every saved night straight away.</p><div class="lm-grid">${num('win','Points for a win',0,50)}${num('tier','Bonus per tier above the gulag',0,20)}${num('upset','Top upset bonus',0,30)}${num('carry','Top carry bonus',0,30)}${num('gulagLoss','Points lost for a gulag loss',0,20)}${num('fullWeeks','Weeks that count in full',1,52)}${num('halfWeeks','Weeks that count half (total)',1,104)}${num('seedBadges','Seed (x) badges for top',0,20)}${num('liveBadges','Tonight’s live (x) for top',0,20)}</div>
     <div class="row"><button class="btn primary" id="rules-save">Save settings</button><button class="btn" id="rules-reset">Back to defaults</button></div>${note('rules')}`;
   // 9. seasons
   const cs=currentSeason(), past=pastSeasons();
@@ -1414,7 +1418,7 @@ function seedView(){
   </tbody></table></div>
   <div class="actions">${!unlocked?'':`<button class="btn${editNames?' primary':''}" id="editnames">${editNames?'Done editing':'Edit names'}</button>${editNames?'<span class="muted">Tap Rename to fix a spelling, </span>':''}`}</div>
   ${(()=>{ const cs=currentSeason(), A=(settings.adjust||[]).filter(a=>!cs.start||a.at>=cs.start); return A.length?`<p class="muted adj-note">Includes point adjustments: ${A.map(a=>`${esc(a.name)} ${a.pts>0?'+':''}${a.pts}${a.reason?` (${esc(a.reason)})`:''}`).join(', ')}.</p>`:''; })()}
-  <details class="pick"><summary>How points work</summary><ul class="rules"><li>Every game: 1 point per game won.</li><li>A win: ${S('win')} points, plus ${S('tier')} for each tier above the gulag.</li><li>Upset bonus: up to ${S('upset')} more for beating a team rated above yours (about ${Math.round(S('upset')/2)} for an even match).</li><li>Carry bonus: up to ${S('carry')} more for winning with a partner rated well below you. It starts at a 50-point rating gap and is full at 250.</li></ul></details>`;
+  <details class="pick"><summary>How points work</summary><ul class="rules"><li>Every game: 1 point per game won.</li><li>A win: ${S('win')} points, plus ${S('tier')} for each tier above the gulag.</li><li>Upset bonus: up to ${S('upset')} more for beating a team rated above yours (about ${Math.round(S('upset')/2)} for an even match).</li><li>Carry bonus: up to ${S('carry')} more for winning with a partner rated well below you. It starts at a 50-point rating gap and is full at 250.</li>${S('gulagLoss')?`<li>Gulag penalty: lose ${S('gulagLoss')} points for each loss in the gulag (not in round 1). A night’s points never go below 0.</li>`:''}</ul></details>`;
 }
 // History editing is locked behind a password; only its SHA-256 hash is stored here.
 const EDIT_HASH='c1916a7b9210afea36583205e616f6320c6e22a2b277176051ce3f39b4b14512';
