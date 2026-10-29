@@ -469,10 +469,11 @@ summary{cursor:pointer;font-weight:600}
 .arr-row.picked .arr-num{color:var(--fg)}
 .arr-row.drop{background:color-mix(in srgb,var(--court) 18%,transparent);outline:2px dashed var(--court);outline-offset:2px}
 .arr-row.lifted{opacity:.35}
-.live-drag .pbtn{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.live-drag .pbtn{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body.dragging{touch-action:none;overscroll-behavior:none}
 .pbtn.lifted{opacity:.35}
 .pbtn.drop{background:color-mix(in srgb,var(--ball) 55%,transparent);outline:2px dashed var(--court);outline-offset:2px;border-radius:4px}
-.p-ghost{padding:6px 12px;font-weight:700;font-size:16px;border:2px solid var(--court);white-space:nowrap}
+.p-ghost{padding:8px 14px;font-weight:700;font-size:18px;border:2px solid var(--court);white-space:nowrap}
 .drag-ghost{position:fixed;z-index:80;pointer-events:none;background:var(--surface);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.28);transform:scale(1.03);padding:4px 0}
 body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .swap-hint{margin:2px 0 8px;font-size:13px}
@@ -1007,38 +1008,47 @@ function swapPlayers(x,y){
   saveNight(); render(); setStatus(msg + (restarted.length ? `. ${restarted.join(' and ')} score cleared` : ''));
 }
 (function(){
+  /* Phones use touch events (iOS Safari cancels pointer events once a finger moves), mice use pointer events. */
   let drag=null, eatClick=false;
-  const targetAt=(x,y,p)=>{ const el=document.elementFromPoint(x,y); const b=el&&el.closest('.live-drag .pbtn[data-player]'); return b && b.dataset.player!==p ? b : null; };
+  const SEL='.live-drag .pbtn[data-player]';
+  const targetAt=(x,y,p)=>{ const el=document.elementFromPoint(x,y); const b=el&&el.closest(SEL); return b && b.dataset.player!==p ? b : null; };
   const clear=()=>document.querySelectorAll('.pbtn.drop').forEach(b=>b.classList.remove('drop'));
-  function end(e, cancel){
-    if(!drag) return; const d=drag; drag=null; clearTimeout(d.timer); clearInterval(d.scroller);
-    if(!d.active) return;
-    eatClick=true; setTimeout(()=>{ eatClick=false; }, 400);
-    if(d.ghost) d.ghost.remove(); clear(); document.body.classList.remove('dragging'); d.src.classList.remove('lifted');
-    if(cancel) return;
-    const t=targetAt(e.clientX,e.clientY,d.p); if(t) swapPlayers(d.p, t.dataset.player);
-  }
-  $('#main').addEventListener('pointerdown', e=>{
-    const b=e.target.closest('.live-drag .pbtn[data-player]'); if(!b || e.button>0) return;
-    drag={p:b.dataset.player, x0:e.clientX, y0:e.clientY, src:b, active:false};
+  function begin(b,x,y){
+    drag={p:b.dataset.player, x0:x, y0:y, lastX:x, lastY:y, src:b, active:false};
     drag.timer=setTimeout(()=>{ if(!drag || drag.active) return; drag.active=true; document.body.classList.add('dragging'); b.classList.add('lifted');
       const g=document.createElement('div'); g.className='drag-ghost p-ghost'; g.textContent=drag.p; document.body.appendChild(g); drag.ghost=g;
-      const place=(x,y)=>{ g.style.left=(x-g.offsetWidth/2)+'px'; g.style.top=(y-g.offsetHeight-14)+'px'; }; drag.place=place; place(drag.x0, drag.y0);
+      place(drag.lastX, drag.lastY);
       try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){}
-      drag.scroller=setInterval(()=>{ if(!drag) return; const y=drag.lastY||drag.y0, H=window.innerHeight; if(y<70) window.scrollBy(0,-12); else if(y>H-70) window.scrollBy(0,12); },16);
+      drag.scroller=setInterval(()=>{ if(!drag) return; const H=window.innerHeight; if(drag.lastY<70) window.scrollBy(0,-12); else if(drag.lastY>H-70) window.scrollBy(0,12); },16);
     }, 350);
-  });
-  window.addEventListener('pointermove', e=>{
-    if(!drag) return; drag.lastY=e.clientY;
-    if(!drag.active){ if(Math.abs(e.clientY-drag.y0)>10 || Math.abs(e.clientX-drag.x0)>10){ clearTimeout(drag.timer); drag=null; } return; } // moved before the hold: it's a scroll
-    e.preventDefault(); drag.place(e.clientX,e.clientY);
-    clear(); const t=targetAt(e.clientX,e.clientY,drag.p); if(t) t.classList.add('drop');
-  }, {passive:false});
-  window.addEventListener('touchmove', e=>{ if(drag && drag.active) e.preventDefault(); }, {passive:false});
-  window.addEventListener('pointerup', e=>end(e,false));
-  window.addEventListener('pointercancel', e=>end(e,!drag||!drag.active?true:false));
-  window.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.live-drag .pbtn')) e.preventDefault(); });
-  // a drag ends with a click on the name it started from; don't open the player menu for it
+  }
+  function place(x,y){ const g=drag&&drag.ghost; if(!g) return; g.style.left=(x-g.offsetWidth/2)+'px'; g.style.top=(y-g.offsetHeight-24)+'px'; }
+  function move(x,y){ // returns true while a drag is under way
+    if(!drag) return false; drag.lastX=x; drag.lastY=y;
+    if(!drag.active){ if(Math.abs(y-drag.y0)>10 || Math.abs(x-drag.x0)>10){ clearTimeout(drag.timer); drag=null; } return false; } // moved before the hold: it's a scroll
+    place(x,y); clear(); const t=targetAt(x,y,drag.p); if(t) t.classList.add('drop'); return true;
+  }
+  function end(x,y,cancel){
+    if(!drag) return false; const d=drag; drag=null; clearTimeout(d.timer); clearInterval(d.scroller);
+    if(!d.active) return false;
+    eatClick=true; setTimeout(()=>{ eatClick=false; }, 500);
+    if(d.ghost) d.ghost.remove(); clear(); document.body.classList.remove('dragging'); d.src.classList.remove('lifted');
+    if(!cancel){ const t=targetAt(x,y,d.p); if(t) swapPlayers(d.p, t.dataset.player); }
+    return true;
+  }
+  // touch
+  document.addEventListener('touchstart', e=>{ const b=e.target.closest&&e.target.closest(SEL); if(!b || e.touches.length>1){ if(drag) end(0,0,true); return; } const t=e.touches[0]; begin(b,t.clientX,t.clientY); }, {passive:true});
+  document.addEventListener('touchmove', e=>{ if(!drag) return; const t=e.touches[0]; if(move(t.clientX,t.clientY)) e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchend', e=>{ if(!drag) return; const t=e.changedTouches[0]; if(end(t.clientX,t.clientY,false)) e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchcancel', ()=>end(0,0,true));
+  // mouse and pen
+  $('#main').addEventListener('pointerdown', e=>{ if(e.pointerType==='touch' || e.button>0) return; const b=e.target.closest(SEL); if(b) begin(b,e.clientX,e.clientY); });
+  window.addEventListener('pointermove', e=>{ if(e.pointerType==='touch') return; if(move(e.clientX,e.clientY)) e.preventDefault(); });
+  window.addEventListener('pointerup', e=>{ if(e.pointerType!=='touch') end(e.clientX,e.clientY,false); });
+  // no copy/lookup menu or text selection on a long press
+  window.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest(SEL)) e.preventDefault(); });
+  document.addEventListener('selectstart', e=>{ if(drag || (e.target.closest && e.target.closest(SEL))) e.preventDefault(); });
+  // a drag can end with a click on the name it started from; don't open the player menu for it
   document.addEventListener('click', e=>{ if(eatClick){ eatClick=false; e.stopPropagation(); e.preventDefault(); } }, true);
 })();
 
