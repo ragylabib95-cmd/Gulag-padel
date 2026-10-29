@@ -234,6 +234,18 @@ select:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
 .mv-up{background:var(--win);color:#fff}
 .mv-down,.mv-off{background:var(--gulag);color:#fff}
 .mv-on{background:var(--ball);color:var(--ball-fg)}
+.mv-busy{background:var(--ball);color:var(--ball-fg);opacity:.75}
+.nx-wait{color:var(--muted);font-style:italic;font-weight:500}
+.carry{border:2px dashed var(--ball);border-radius:12px;padding:10px;margin:0 0 16px}
+.carry-head{display:flex;flex-direction:column;gap:2px;margin:0 2px 10px}
+.carry-head .muted{font-size:13px}
+.carry .court{margin-bottom:8px}.carry .court:last-child{margin-bottom:0}
+.court.waiting{opacity:.8}
+.court.waiting .court-head{background:var(--muted)}
+.waiting-for{font-weight:500;font-style:italic;color:var(--muted);font-size:.85em}
+.wait-note{font-size:13px;margin:0;padding:0 12px 12px}
+.next-note{font-size:13px;margin:8px 2px 0;text-align:center}
+#next small{font-weight:500;opacity:.85}
 .summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0 14px;display:flex;flex-direction:column;gap:10px}
 .sum-head{font-family:var(--display);font-weight:800;font-size:22px;text-transform:uppercase;letter-spacing:.03em;color:var(--court)}
 .sum-when{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
@@ -682,7 +694,7 @@ function seeding(season, before){
   return Object.values(s).map(x=>({...x, seed:Math.round(x.seed), rating:Math.round(rate(h.elo,x.name))}))
     .sort((a,b)=> b.seed-a.seed || b.rating-a.rating || a.name.localeCompare(b.name));
 }
-function tonightGames(){ return [...night.log, ...night.courts.map((c,i)=>({round:night.round, court:i, courts:night.courts.length, pairs:c.pairs, score:c.score, winner:c.winner})).filter(g=>g.winner!=null)]; }
+function tonightGames(){ return [...night.log, ...(night.carry?night.carry.courts.filter(g=>g.winner!=null):[]), ...night.courts.map((c,i)=>({round:night.round, court:i, courts:night.courts.length, pairs:c.pairs, score:c.score, winner:c.winner})).filter(g=>g.winner!=null)]; }
 function tonight(){ const elo={...history().elo}; return rank(playGames(tonightGames(), elo)); }
 
 /* ---------- court logic ---------- */
@@ -733,30 +745,55 @@ function reignOf(log, pair){ // consecutive Tier 1 wins by this exact pair, most
 }
 function crownCourt(c, log){ c.kotc=true; c.kings=[...c.a]; c.pairs=[[...c.a],[...c.b]]; c.face='kotc'; c.reign=Math.max(1,reignOf(log,c.a)); c.aLab='Kings'; c.bLab='Challengers'; }
 function advance(night){
-  const C = night.courts, n=C.length;
-  C.forEach((c,i)=> night.log.push({round:night.round, court:i, courts:n, pairs:c.pairs, score:c.score, winner:c.winner, ...(c.kotc?{kotc:true}:{})}));
-  const W = C.map(c=>c.pairs[c.winner]), L = C.map(c=>c.pairs[1-c.winner]);
+  /* Courts still playing don't hold the night up: finished courts move on now, and a court whose players
+     come from an unfinished game waits for that result (night.carry), then fills in when it's confirmed. */
+  const C = night.courts, n=C.length, R=night.round, fin=c=>c.pairs && c.winner!=null, carry=[];
+  C.forEach((c,i)=>{ const g={round:R, court:i, courts:n, pairs:c.pairs, score:c.score, winner:c.winner, ...(c.kotc?{kotc:true}:{})};
+    if(fin(c)) night.log.push(g); else carry.push({...g, aLab:c.aLab, bLab:c.bLab, ...(c.kings?{kings:c.kings, reign:c.reign}:{})}); });
+  const side = (i,res) => fin(C[i]) ? [...C[i].pairs[res==='W'?C[i].winner:1-C[i].winner]] : null;
   const next = [];
   for(let i=0;i<n;i++){
-    let a,b,aLab,bLab; // each group were teammates last game; the draw always splits them
-    if(n===1){ a=W[0]; b=L[0]; aLab='Won'; bLab='Lost'; }
-    else if(i===0){ a=W[0]; b=W[1]; aLab='Won Tier 1, stayed'; bLab='Won, came up'; }
-    else if(i===n-1){ a=L[i-1]; b=L[i]; aLab='Lost, came down'; bLab='Lost in the gulag'; }
-    else { a=L[i-1]; b=W[i+1]; aLab='Lost, came down'; bLab='Won, came up'; }
-    next.push({a:[...a], b:[...b], aLab, bLab, free:false, pairs:null, face:null, score:null, winner:null});
+    let A,B,aLab,bLab; // each group were teammates last game; the draw always splits them
+    if(n===1){ A=[0,'W']; B=[0,'L']; aLab='Won'; bLab='Lost'; }
+    else if(i===0){ A=[0,'W']; B=[1,'W']; aLab='Won Tier 1, stayed'; bLab='Won, came up'; }
+    else if(i===n-1){ A=[i-1,'L']; B=[i,'L']; aLab='Lost, came down'; bLab='Lost in the gulag'; }
+    else { A=[i-1,'L']; B=[i+1,'W']; aLab='Lost, came down'; bLab='Won, came up'; }
+    const wait=[], fill=(key,[k,res])=>{ const s=side(k,res); if(s) return s; wait.push({key,gi:0,court:k,res,n},{key,gi:1,court:k,res,n}); return [null,null]; };
+    const c={a:fill('a',A), b:fill('b',B), aLab, bLab, free:false, pairs:null, face:null, score:null, winner:null};
+    if(wait.length) c.wait=wait;
+    next.push(c);
   }
   const g = next[n-1], swaps = Math.min(night.bench.length, 2), sl = slamState(night); // rule 7
+  let out=null;
   if(swaps){
     let inc;
     if(swaps===2 && sl && sl.winner!=null){ inc=[night.bench[0], sl.pair[sl.winner]]; night.bench=night.bench.filter(p=>!inc.includes(p)); } // slam loser keeps their place at the front
     else inc=night.bench.splice(0, swaps);
-    const out = g.b.splice(0, swaps, ...inc); night.bench.push(...out);
-    if(out.length===2) night.offPairs=[...(night.offPairs||[]), out].slice(-6);
+    const off = g.b.splice(0, swaps, ...inc);
+    if(off.every(Boolean)){ night.bench.push(...off); if(off.length===2) night.offPairs=[...(night.offPairs||[]), off].slice(-6); }
+    else { const w=g.wait.filter(x=>x.key==='b'); out={court:w[0].court, res:w[0].res, k:Array.from({length:swaps},(_,j)=>j)};
+      g.wait=g.wait.filter(x=>!(x.key==='b' && x.gi<swaps)); if(!g.wait.length) delete g.wait; }
     g.bLab = swaps===2 ? 'Subbed on' : 'Sub + gulag loser';
   }
   night.slam=null; night.leaveUndo=[];
-  if(n>1 && kotcOn(night, night.round+1)) crownCourt(next[0], night.log);
+  let crown=false;
+  if(n>1 && kotcOn(night, night.round+1)){ if(next[0].wait) crown=true; else crownCourt(next[0], night.log); }
   night.courts = next; night.round++;
+  night.carry = carry.length ? {round:R, n, courts:carry, out, crown} : null;
+}
+const waitLab = w => `${courtName(w.court, w.n)} ${w.res==='W'?'winners':'losers'}`;
+// A game still playing from the last round is confirmed: log it and put its players where they were waiting to go.
+function resolveCarry(k){
+  const K=night.carry; if(!K) return; const g=K.courts.find(x=>x.court===k); if(!g || g.winner==null) return;
+  const {aLab,bLab,kings,reign,...rec}=g; night.log.push(rec);
+  const pick = res => g.pairs[res==='W'?g.winner:1-g.winner];
+  night.courts.forEach(c=>{ if(!c.wait) return;
+    c.wait.filter(w=>w.court===k).forEach(w=>{ c[w.key][w.gi]=pick(w.res)[w.gi]; });
+    c.wait=c.wait.filter(w=>w.court!==k); if(!c.wait.length) delete c.wait; });
+  if(K.out && K.out.court===k){ const off=K.out.k.map(j=>pick(K.out.res)[j]); night.bench.push(...off); if(off.length===2) night.offPairs=[...(night.offPairs||[]), off].slice(-6); K.out=null; }
+  K.courts=K.courts.filter(x=>x!==g);
+  if(K.crown && night.courts[0] && !night.courts[0].wait){ crownCourt(night.courts[0], night.log); K.crown=false; }
+  if(!K.courts.length) night.carry=null;
 }
 // Point slam: when the second sub spot would go to one of the pair who just lost in the gulag, they play each other for it (best of 3 points).
 function slamPair(N){ const b=N.bench; if(b.length<3 || !N.courts.length) return null; const x=b[1], y=b[2];
@@ -767,10 +804,14 @@ function slamState(N){ const pr=slamPair(N); if(!pr) return null;
   return {pair:pr, score:sc, winner:w, first:N.bench[0]}; }
 const locMap = N => { const m={}; N.courts.forEach((c,i)=>[...c.a,...c.b].forEach(p=>{ if(p) m[p]=i; })); N.bench.forEach(p=> m[p]='sub'); return m; };
 const moveOf = (b,a) => a===undefined ? 'left' : b==='sub' && a==='sub' ? 'wait' : b==='sub' ? 'on' : a==='sub' ? 'off' : a<b ? 'up' : a>b ? 'down' : 'stay';
-const MOVE_LABEL = {up:'Up', down:'Down', stay:'Stays', on:'On', off:'Off', wait:'Waits', left:'Left'};
+const MOVE_LABEL = {up:'Up', down:'Down', stay:'Stays', on:'On', off:'Off', wait:'Waits', left:'Left', busy:'Playing'};
 function nextPreview(){
   const N=JSON.parse(JSON.stringify(night)), before=locMap(night); advance(N); const after=locMap(N);
-  return {courts:N.courts.map((c,i)=>({name:courtName(i,N.courts.length), gul:N.courts.length>1&&i===N.courts.length-1, players:[...c.a,...c.b].map(p=>({p, mv:moveOf(before[p],after[p])}))})),
+  (N.carry?N.carry.courts:[]).forEach(g=>g.pairs.flat().forEach(p=>{ after[p]='busy'; }));
+  const mv=p=>after[p]==='busy'?'busy':moveOf(before[p],after[p]);
+  return {courts:N.courts.map((c,i)=>({name:courtName(i,N.courts.length), gul:N.courts.length>1&&i===N.courts.length-1,
+            players:['a','b'].flatMap(key=>c[key].map((p,gi)=>{ if(p) return {p, mv:mv(p)}; const w=(c.wait||[]).find(x=>x.key===key&&x.gi===gi); return {p:null, lab:w?waitLab(w):'To come'}; }))})),
+          playing:N.carry?N.carry.courts.map(g=>courtName(g.court,g.courts)):[],
           bench:N.bench.map(p=>({p, mv:moveOf(before[p],after[p])}))};
 }
 function resetCourt(c, N){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.score=null; c.winner=null; c.free = N.round===1 && !N.log.length; }
@@ -1102,6 +1143,13 @@ function courtView(c,i,n,ro){
   const g = n>1 && i===n-1, tag=courtTag(i,n);
   const st = !c.pairs ? '<span class="state">Pick partners</span>' : c.winner==null ? '<span class="state playing">Playing</span>' : '<span class="state">Done</span>';
   let body;
+  if(c.wait){
+    const slot=(key)=>c[key].map((p,gi)=>{ if(p) return nm(p); const w=c.wait.find(x=>x.key===key&&x.gi===gi); return `<span class="waiting-for">${w?esc(waitLab(w)):'To come'}</span>`; }).join('<br>');
+    const from=[...new Set(c.wait.map(w=>courtName(w.court,w.n)))].join(' and ');
+    return `<section class="court waiting${g?' gulag':''}"><div class="court-head"><span><span class="name">${courtName(i,n)}</span>${tag?`<span class="tag">${tag}</span>`:''}</span><span class="state">Waiting</span></div>
+      <div class="slots"><div class="slot"><div class="lab">${esc(c.aLab)}</div><b>${slot('a')}</b></div><div class="slot"><div class="lab">${esc(c.bLab)}</div><b>${slot('b')}</b></div></div>
+      <p class="muted wait-note">Waiting for ${from} to finish. This court fills in once that score is in.</p></section>`;
+  }
   if(!c.pairs){
     const opts = allOptions(c).map((o,k)=>`<button class="opt" data-opt="${i}:${k}">${o.map(t=>t.map(nm).join(' &amp; ')).join(' <span class="muted">vs</span> ')}</button>`).join('');
     body = `<div class="slots"><div class="slot"><div class="lab">${esc(c.aLab)}</div><b>${c.a.map(x=>pb(x,ro)).join('<br>')}</b></div><div class="slot"><div class="lab">${esc(c.bLab)}</div><b>${c.b.map(x=>pb(x,ro)).join('<br>')}</b></div></div>
@@ -1117,6 +1165,16 @@ function courtView(c,i,n,ro){
     }).join('') + `<div class="court-foot"><span class="muted">${c.winner!=null?`Final ${c.score[0]}–${c.score[1]}`:'First to 3 games'}</span>${ro||c.kotc||(c.score&&(c.score[0]!=null||c.score[1]!=null))?'':`<button class="btn sm" data-redraw="${i}">Change partners</button>`}</div>`;
   }
   return `<section class="court${g?' gulag':''}${c.kotc?' kotc':''}${c.kotc&&c.reign>=2?' reign':''}"><div class="court-head"><span><span class="name">${courtName(i,n)}</span>${c.kotc?`<span class="tag">King of the court</span>`:tag?`<span class="tag">${tag}</span>`:''}</span>${st}</div>${body}</section>`;
+}
+function carryView(ro){
+  const K=night.carry; if(!K) return '';
+  return `<div class="carry"><div class="carry-head"><b>Still playing from round ${K.round}</b><span class="muted">${ro?'These finish first, then their players move on.':'Enter the score when they finish, then confirm to move the players on.'}</span></div>${K.courts.map(g=>{
+    const pend=g.winner!=null;
+    const teams=g.pairs.map((pr,t)=>{ const sc=g.score&&g.score[t], won=g.winner===t;
+      return `<div class="team${won?' won':''}"><div class="tn"><b>${pr.map(nm).join(' &amp; ')}</b><span class="hint">${won?'Won':g.winner===1-t?'Lost':'Games won'}</span></div>
+      ${ro?`<span class="g-score big">${sc!=null?sc:'–'}</span>`:`<div class="sc" role="group" aria-label="Games won by ${pr.map(esc).join(' and ')}">${[0,1,2,3].map(v=>`<button class="sv${sc===v?' on':''}" data-cscore="${g.court}:${t}:${v}" aria-pressed="${sc===v}">${v}</button>`).join('')}</div>`}</div>`; }).join('');
+    return `<section class="court carried${g.courts>1&&g.court===g.courts-1?' gulag':''}"><div class="court-head"><span><span class="name">${courtName(g.court,g.courts)}</span><span class="tag">Round ${g.round}</span></span><span class="state playing">Playing</span></div>${teams}
+      <div class="court-foot"><span class="muted">${pend?`Final ${g.score[0]}–${g.score[1]}`:'First to 3 games'}</span>${!ro&&pend?`<button class="btn sm primary" data-cdone="${g.court}">Confirm and move them on</button>`:''}</div></section>`; }).join('')}</div>`;
 }
 /* ---------- earlier rounds tonight: view and fix scores ---------- */
 let viewRound=null, rDraft=null, rErr='';
@@ -1322,14 +1380,15 @@ function saveRound(redo){
 function liveView(ro){
   if(viewRound!==null && !night.log.some(g=>g.round===viewRound)) { viewRound=null; rDraft=null; }
   if(viewRound!==null) return roundTabs()+pastRoundView()+`<h2>Tonight’s ranking</h2>${tonightGames().length?rankTable(tonight(),{left:night.left}):''}`;
-  const sl=slamState(night), C=night.courts, n=C.length, undrawn=C.some(c=>!c.pairs), courtsDone=n && C.every(c=>c.winner!=null), done=courtsDone && (!sl || sl.winner!=null);
+  const sl=slamState(night), C=night.courts, n=C.length, undrawn=C.some(c=>!c.pairs&&!c.wait), courtsDone=n && C.every(c=>c.winner!=null), done=courtsDone && (!sl || sl.winner!=null),
+    K=night.carry, playing=C.filter(c=>c.pairs&&c.winner==null).length, canNext=n>1 && !K && !undrawn && C.some(c=>c.winner!=null) && (!sl || sl.winner!=null), early=canNext && !courtsDone, nextOk=!K && (done||canNext);
   const active=[...C.flatMap(c=>[...c.a,...c.b]), ...night.bench];
-  const top = ro ? '<span class="state playing live-pill">Live</span>' : !n ? '<span class="muted">No court running</span>' : undrawn ? '<button class="btn primary" id="draw">Flip for partners</button>' : done ? '<span class="muted">All scores in. Next round is below.</span>' : courtsDone ? '<span class="muted">Finish the point slam</span>' : '<span class="muted">Enter each court’s score</span>';
+  const top = ro ? '<span class="state playing live-pill">Live</span>' : !n ? '<span class="muted">No court running</span>' : undrawn ? '<button class="btn primary" id="draw">Flip for partners</button>' : done ? '<span class="muted">All scores in. Next round is below.</span>' : courtsDone ? '<span class="muted">Finish the point slam</span>' : C.some(c=>c.wait) ? '<span class="muted">Some courts waiting</span>' : '<span class="muted">Enter each court’s score</span>';
   const canUndo = !ro && (night.undo||[]).length;
   let check='';
-  if(!ro && confirming==='next' && done){
-    const P=nextPreview(), tag=x=>`<span class="nx-p"><span class="mv mv-${x.mv}">${MOVE_LABEL[x.mv]}</span>${esc(x.p)}</span>`;
-    check=`<div class="confirm nx-box"><p><b>Round ${night.round+1} lineup.</b> Check the moves, then confirm.</p>${P.courts.map(c=>`<div class="nx"><span class="nx-court${c.gul?' gul':''}">${c.name}</span><div class="nx-pl">${c.players.map(tag).join('')}</div></div>`).join('')}${P.bench.length?`<div class="nx"><span class="nx-court sub">Subs</span><div class="nx-pl">${P.bench.map(tag).join('')}</div></div>`:''}<div class="row"><button class="btn primary" id="next-yes">Confirm next round</button><button class="btn" id="next-no">Back</button></div></div>`;
+  if(!ro && confirming==='next' && nextOk){
+    const P=nextPreview(), tag=x=>x.p?`<span class="nx-p"><span class="mv mv-${x.mv}">${MOVE_LABEL[x.mv]}</span>${esc(x.p)}</span>`:`<span class="nx-p nx-wait"><span class="mv mv-wait">Waits</span>${esc(x.lab)}</span>`;
+    check=`<div class="confirm nx-box"><p><b>Round ${night.round+1} lineup.</b> Check the moves, then confirm.</p>${P.playing.length?`<p class="muted">${P.playing.join(' and ')} ${P.playing.length>1?'are':'is'} still playing. ${P.playing.length>1?'They stay':'It stays'} on screen to score, and the courts waiting on ${P.playing.length>1?'them':'it'} fill in once ${P.playing.length>1?'each result is':'the result is'} confirmed.</p>`:''}${P.courts.map(c=>`<div class="nx"><span class="nx-court${c.gul?' gul':''}">${c.name}</span><div class="nx-pl">${c.players.map(tag).join('')}</div></div>`).join('')}${P.bench.length?`<div class="nx"><span class="nx-court sub">Subs</span><div class="nx-pl">${P.bench.map(tag).join('')}</div></div>`:''}<div class="row"><button class="btn primary" id="next-yes">Confirm next round</button><button class="btn" id="next-no">Back</button></div></div>`;
   } else if(!ro && confirming==='undo'){
     check=`<div class="confirm"><p>Go back to round ${night.round-1}? Courts, partners and scores return to how they were before you tapped Next round. Anything changed since then is cleared.</p><div class="row"><button class="btn danger" id="undo-yes">Undo last round</button><button class="btn" id="end-no">Keep this round</button></div></div>`;
   }
@@ -1344,13 +1403,15 @@ function liveView(ro){
     return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${auto?' (auto)':''}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
+  ${carryView(ro)}
   ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
-  ${!ro && night.planned && n<night.planned ? (night.bench.length>=4
+  ${!ro && !K && night.planned && n<night.planned ? (night.bench.length>=4
     ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button></div>`
     : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Add latecomers as late arrivals below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
-  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
+  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
-  ${!ro&&done?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round</button>`}</div>`:''}
+  ${!ro&&nextOk?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round${early?` <small>(${playing} still playing)</small>`:''}</button>${early?`<p class="muted next-note">Courts that finished move on now. ${playing===1?'The game still going stays':'The games still going stay'} on screen to score.</p>`:''}`}</div>`
+    :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
   ${ro?'':`<form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Late arrival" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form>`}
   <h2>Tonight’s ranking</h2>
   ${tonightGames().length?rankTable(tonight(),{left:night.left}):'<p class="muted">Fills in as scores go in.</p>'}
@@ -1370,6 +1431,7 @@ async function renamePlayer(old, nw, why){
   const N = night;
   N.setup.names = swl(N.setup.names); N.arrivals = swa(N.arrivals); N.bench = swl(N.bench); N.left = swa(N.left);
   N.courts.forEach(c=>{ c.a=swl(c.a); c.b=swl(c.b); if(c.pairs) c.pairs=c.pairs.map(swl); });
+  if(N.carry) N.carry.courts.forEach(g=>{ if(g.pairs) g.pairs=g.pairs.map(swl); if(g.kings) g.kings=swl(g.kings); });
   N.log.forEach(g=>{ if(g.pairs) g.pairs=g.pairs.map(swl); });
   saveNight();
   for(const nt of nights){
@@ -1593,7 +1655,8 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='ann-fill'){ const a=lastAnn(); if(a){ const names=(a.players||[]).map(p=>resolveName(p)||p); night.setup.names=names.slice(); night.setup.courts=Math.max(1,Math.min(MAXC,a.courts||night.setup.courts)); night.setup.subs=Math.max(0,Math.min(MAXS,names.length-night.setup.courts*4)); if(a.venue) night.setup.venue=a.venue; names.forEach(n=>{ if(!roster.includes(n)){ roster.push(n); } }); saveRoster(); saveNight(); render(); } }
   else if(t.id==='kotc-toggle'){ const on = !(night.kotc===true || (night.kotc!==false && night.round>=3));
     night.kotc = on; const c=night.courts[0];
-    if(c && night.courts.length>1 && night.round>=2 && !(c.score&&(c.score[0]!=null||c.score[1]!=null))){ if(on && !c.kotc) crownCourt(c, night.log); else if(!on && c.kotc){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.aLab='Won Tier 1, stayed'; c.bLab='Won, came up'; } }
+    if(c && c.wait && night.carry){ night.carry.crown = on && night.round>=2; }
+    else if(c && night.courts.length>1 && night.round>=2 && !(c.score&&(c.score[0]!=null||c.score[1]!=null))){ if(on && !c.kotc) crownCourt(c, night.log); else if(!on && c.kotc){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.aLab='Won Tier 1, stayed'; c.bLab='Won, came up'; } }
     logChange(`King of the court switched ${on?'on':'off'} in round ${night.round}`); saveNight(); render(); }
   else if(t.id==='lmlock'){ if(authApi) authApi.signOut(); renaming=null; confirming=null; editNight=null; draft=null; tab='seed'; render(); }
   else if(d.amode){ authMode=d.amode; authMsg=null; render(); const i=$('#auth-email'); if(i) i.focus(); }
@@ -1658,6 +1721,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next-no'){ confirming=null; render(); }
   else if(t.id==='undo'){ confirming='undo'; render(); }
   else if(t.id==='undo-yes') undoRound();
+  else if(d.player!=null && night.carry){ setStatus(`Leaving early works again once round ${night.carry.round}’s last score is confirmed`, true); }
   else if(d.player!=null){ sheet={p:d.player, step:'menu'}; render(); const f=$('#sheet-left'); if(f) f.focus(); }
   else if(t.id==='sheet-close'){ sheet=null; render(); }
   else if(t.id==='sheet-left'){ sheet.step='replace'; render(); const f=document.querySelector('.rep, #sheet-bench-yes'); if(f) f.focus(); }
@@ -1673,6 +1737,9 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='addcourt') addCourtFromSubs();
   else if(d.opt){ const [ci,k]=d.opt.split(':').map(Number), c=night.courts[ci]; c.pairs=allOptions(c)[k]; c.face='picked'; saveNight(); render(); }
   else if(d.redraw!=null){ const c=night.courts[+d.redraw]; c.pairs=null; c.face=null; c.score=null; c.winner=null; saveNight(); render(); }
+  else if(d.cscore){ const [k,tmi,v]=d.cscore.split(':').map(Number), g=night.carry&&night.carry.courts.find(x=>x.court===k); if(g){ setScore(g,tmi,v); saveNight(); render(); } }
+  else if(d.cdone!=null){ const k=+d.cdone, g=night.carry&&night.carry.courts.find(x=>x.court===k);
+    if(g && g.winner!=null){ logScore(`Round ${g.round}, ${courtName(k,g.courts)}: result ${fmtRes(g.pairs,g.score)} (finished after round ${night.round} started)`); resolveCarry(k); saveNight(); render(); } }
   else if(d.score){ const [ci,tmi,v]=d.score.split(':').map(Number), c=night.courts[ci];
     setScore(c,tmi,v);
     if(c.winner!=null){ const res=fmtRes(c.pairs,c.score), where=`Round ${night.round}, ${courtName(ci,night.courts.length)}`;
@@ -1734,7 +1801,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet){ sheet=n
 
 /* ---------- the flip ---------- */
 let flipQ=[], flipI=0, spin=0, busy=false;
-function openFlip(){ refreshSeeds(); flipQ = night.courts.map((c,i)=>i).filter(i=>!night.courts[i].pairs); if(!flipQ.length) return; flipI=0; $('#flip').hidden=false; document.body.style.overflow='hidden'; showFlip(); }
+function openFlip(){ refreshSeeds(); flipQ = night.courts.map((c,i)=>i).filter(i=>!night.courts[i].pairs && !night.courts[i].wait); if(!flipQ.length) return; flipI=0; $('#flip').hidden=false; document.body.style.overflow='hidden'; showFlip(); }
 function closeFlip(){ $('#flip').hidden=true; document.body.style.overflow=''; saveNight(); render(); }
 function showFlip(){
   const i=flipQ[flipI], c=night.courts[i], n=night.courts.length;
