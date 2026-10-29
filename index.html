@@ -469,6 +469,10 @@ summary{cursor:pointer;font-weight:600}
 .arr-row.picked .arr-num{color:var(--fg)}
 .arr-row.drop{background:color-mix(in srgb,var(--court) 18%,transparent);outline:2px dashed var(--court);outline-offset:2px}
 .arr-row.lifted{opacity:.35}
+.live-drag .pbtn{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.pbtn.lifted{opacity:.35}
+.pbtn.drop{background:color-mix(in srgb,var(--ball) 55%,transparent);outline:2px dashed var(--court);outline-offset:2px;border-radius:4px}
+.p-ghost{padding:6px 12px;font-weight:700;font-size:16px;border:2px solid var(--court);white-space:nowrap}
 .drag-ghost{position:fixed;z-index:80;pointer-events:none;background:var(--surface);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.28);transform:scale(1.03);padding:4px 0}
 body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .swap-hint{margin:2px 0 8px;font-size:13px}
@@ -981,6 +985,63 @@ function swapSlots(i,j){ if(i===j) return; const s=night.setup, L=s.courts*4+s.s
   window.addEventListener('pointercancel', e=>end(e,true));
 })();
 
+/* ---------- live night: press and hold a player, drag onto another player (or a sub) to swap them ---------- */
+function whereIs(p){ const ci=night.courts.findIndex(c=>[...c.a,...c.b].includes(p)); return ci>=0 ? courtName(ci,night.courts.length) : night.bench.includes(p) ? 'the subs' : null; }
+function swapPlayers(x,y){
+  if(!x || !y || x===y) return;
+  const wx=whereIs(x), wy=whereIs(y); if(!wx || !wy) return;
+  const sw = p => p===x ? y : p===y ? x : p, swl = a => a ? a.map(sw) : a;
+  const restarted=[];
+  night.courts.forEach((c,i)=>{
+    const before=JSON.stringify(c.pairs||[c.a,c.b]);
+    c.a=swl(c.a); c.b=swl(c.b); if(c.pairs) c.pairs=c.pairs.map(swl); if(c.kings) c.kings=swl(c.kings);
+    const after=JSON.stringify(c.pairs||[c.a,c.b]);
+    if(before!==after){ // the court's teams changed
+      if(c.kotc && c.kings) c.reign=Math.max(1, reignOf(night.log, c.kings));
+      if(c.score && (c.score[0]!=null || c.score[1]!=null)){ c.score=null; c.winner=null; c.loggedRes=null; restarted.push(courtName(i,night.courts.length)); }
+    }
+  });
+  night.bench=swl(night.bench); night.leaveUndo=[];
+  const msg = wx===wy ? `Swapped ${x} and ${y} on ${wx}` : `Swapped ${x} (${wx}) with ${y} (${wy})`;
+  logChange(`Round ${night.round}: ${msg}`); if(restarted.length) logScore(`Round ${night.round}: ${msg}; ${restarted.join(' and ')} score cleared`);
+  saveNight(); render(); setStatus(msg + (restarted.length ? `. ${restarted.join(' and ')} score cleared` : ''));
+}
+(function(){
+  let drag=null, eatClick=false;
+  const targetAt=(x,y,p)=>{ const el=document.elementFromPoint(x,y); const b=el&&el.closest('.live-drag .pbtn[data-player]'); return b && b.dataset.player!==p ? b : null; };
+  const clear=()=>document.querySelectorAll('.pbtn.drop').forEach(b=>b.classList.remove('drop'));
+  function end(e, cancel){
+    if(!drag) return; const d=drag; drag=null; clearTimeout(d.timer); clearInterval(d.scroller);
+    if(!d.active) return;
+    eatClick=true; setTimeout(()=>{ eatClick=false; }, 400);
+    if(d.ghost) d.ghost.remove(); clear(); document.body.classList.remove('dragging'); d.src.classList.remove('lifted');
+    if(cancel) return;
+    const t=targetAt(e.clientX,e.clientY,d.p); if(t) swapPlayers(d.p, t.dataset.player);
+  }
+  $('#main').addEventListener('pointerdown', e=>{
+    const b=e.target.closest('.live-drag .pbtn[data-player]'); if(!b || e.button>0) return;
+    drag={p:b.dataset.player, x0:e.clientX, y0:e.clientY, src:b, active:false};
+    drag.timer=setTimeout(()=>{ if(!drag || drag.active) return; drag.active=true; document.body.classList.add('dragging'); b.classList.add('lifted');
+      const g=document.createElement('div'); g.className='drag-ghost p-ghost'; g.textContent=drag.p; document.body.appendChild(g); drag.ghost=g;
+      const place=(x,y)=>{ g.style.left=(x-g.offsetWidth/2)+'px'; g.style.top=(y-g.offsetHeight-14)+'px'; }; drag.place=place; place(drag.x0, drag.y0);
+      try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){}
+      drag.scroller=setInterval(()=>{ if(!drag) return; const y=drag.lastY||drag.y0, H=window.innerHeight; if(y<70) window.scrollBy(0,-12); else if(y>H-70) window.scrollBy(0,12); },16);
+    }, 350);
+  });
+  window.addEventListener('pointermove', e=>{
+    if(!drag) return; drag.lastY=e.clientY;
+    if(!drag.active){ if(Math.abs(e.clientY-drag.y0)>10 || Math.abs(e.clientX-drag.x0)>10){ clearTimeout(drag.timer); drag=null; } return; } // moved before the hold: it's a scroll
+    e.preventDefault(); drag.place(e.clientX,e.clientY);
+    clear(); const t=targetAt(e.clientX,e.clientY,drag.p); if(t) t.classList.add('drop');
+  }, {passive:false});
+  window.addEventListener('touchmove', e=>{ if(drag && drag.active) e.preventDefault(); }, {passive:false});
+  window.addEventListener('pointerup', e=>end(e,false));
+  window.addEventListener('pointercancel', e=>end(e,!drag||!drag.active?true:false));
+  window.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.live-drag .pbtn')) e.preventDefault(); });
+  // a drag ends with a click on the name it started from; don't open the player menu for it
+  document.addEventListener('click', e=>{ if(eatClick){ eatClick=false; e.stopPropagation(); e.preventDefault(); } }, true);
+})();
+
 /* ---------- night summary ---------- */
 let justEnded=null, sumOpen=null, copied=null, copyFallback=null;
 function summaryData(date){
@@ -1103,7 +1164,7 @@ function render(){
   const shown = (tab==='night' && v) || (night.phase==='live' && night.venue);
   $('#venue-name').textContent = shown && VENUES[shown] ? VENUES[shown].name : '';
   document.querySelectorAll('nav button').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===tab));
-  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? liveView(!ref) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
+  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? (ref ? `<div class="live-drag">${liveView(false)}</div>` : liveView(true)) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
 }
 const pts = n => `<span class="pts">${n}</span>`;
 function rankTable(rows, opts={}){
@@ -1402,7 +1463,7 @@ function liveView(ro){
     const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn ? (night.round===1?'On from round 2':'On from next round') : auto&&night.round<3 ? 'Starts round 3' : 'Off';
     return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${auto?' (auto)':''}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
-  <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
+  <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. Press and hold a name, then drag it onto another player or a sub to swap them. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${carryView(ro)}
   ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
   ${!ro && !K && night.planned && n<night.planned ? (night.bench.length>=4
