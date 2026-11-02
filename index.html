@@ -762,12 +762,21 @@ function rotateOneCourt(night){
   pool.forEach(p=>{ if(!(p in sat)) sat[p]=base; }); // a late arrival starts level with the fewest sit-outs, not behind
   night.bench.forEach(p=>{ sat[p]++; last[p]=R; });
   const m=Math.max(0,pool.length-4), tie=new Map(pool.map(p=>[p,rnd()]));
-  const order=pool.slice().sort((x,y)=>(sat[x]||0)-(sat[y]||0) || (last[x]||0)-(last[y]||0) || tie.get(x)-tie.get(y));
-  const sitting=order.slice(0,m), on=pool.filter(p=>!sitting.includes(p));
-  // random teams, avoiding partnerships already played tonight where possible
-  const done={}; night.log.forEach(g=>(g.pairs||[]).forEach(pr=>{ const k=pairKey(pr); done[k]=(done[k]||0)+1; }));
-  const [w,x,y,z]=on, splits=[[[w,x],[y,z]],[[w,y],[x,z]],[[w,z],[x,y]]].map(sp=>({sp, cost:sp.reduce((t,pr)=>t+(done[pairKey(pr)]||0),0), r:rnd()}));
-  const pick=splits.sort((a,b)=>a.cost-b.cost || a.r-b.r)[0].sp.map(pr=>rnd()<.5?pr:[pr[1],pr[0]]);
+  // what's been played tonight: matchups (pair v pair), partnerships and opponents
+  const mk=sp=>[pairKey(sp[0]),pairKey(sp[1])].sort().join('/'), seen={mu:{}, pa:{}, op:{}}, inc=(o,k)=>{ o[k]=(o[k]||0)+1; };
+  night.log.forEach(g=>{ if(!g.pairs || g.pairs.some(pr=>!pr||pr.some(x=>!x))) return; inc(seen.mu,mk(g.pairs)); g.pairs.forEach(pr=>inc(seen.pa,pairKey(pr)));
+    g.pairs[0].forEach(x=>g.pairs[1].forEach(y=>inc(seen.op,pairKey([x,y])))); });
+  const splitCost=sp=>[seen.mu[mk(sp)]||0, sp.reduce((t,pr)=>t+(seen.pa[pairKey(pr)]||0),0), sp[0].reduce((t,x)=>t+sp[1].reduce((u,y)=>u+(seen.op[pairKey([x,y])]||0),0),0)];
+  const lex=(a,b)=>{ for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return a[i]-b[i]; return 0; };
+  const bestSplit=four=>{ const [w,x,y,z]=four; return [[[w,x],[y,z]],[[w,y],[x,z]],[[w,z],[x,y]]].map(sp=>({sp, c:[...splitCost(sp), rnd()]})).sort((a,b)=>lex(a.c,b.c))[0]; };
+  // who sits: fewest sit-outs first (always fair). With one sitter (5 players) it's a strict cycle, so everyone plays 4 then sits 1.
+  // With more sitters, the group left on court is one that gives a matchup not played yet; after that, nobody sits twice in a row where avoidable.
+  const combos=(arr,k)=>k===0?[[]]:arr.length<k?[]:[...combos(arr.slice(1),k-1).map(c=>[arr[0],...c]), ...combos(arr.slice(1),k)];
+  const opts=combos(pool,m).map(sitting=>{ const on=pool.filter(p=>!sitting.includes(p)), bs=bestSplit(on);
+    const cnt=sitting.reduce((t,p)=>t+sat[p],0), recent=sitting.reduce((t,p)=>t+(last[p]||0),0), b2b=sitting.filter(p=>last[p]===R).length, tb=sitting.reduce((t,p)=>t+tie.get(p),0);
+    return {sitting, on, bs, c: m===1 ? [cnt, recent, ...bs.c] : [cnt, bs.c[0]>0?1:0, b2b, ...bs.c.slice(0,3), recent, tb]}; });
+  const best=opts.sort((a,b)=>lex(a.c,b.c))[0], sitting=best.sitting, on=best.on;
+  const pick=best.bs.sp.map(pr=>rnd()<.5?pr:[pr[1],pr[0]]);
   night.courts=[{a:pick[0], b:pick[1], aLab:'Team', bLab:'Team', free:true, pairs:on.length===4?pick:null, face:'rotate', score:null, winner:null}];
   night.bench=sitting; night.slam=null; night.leaveUndo=[]; night.carry=null; night.round++;
 }
