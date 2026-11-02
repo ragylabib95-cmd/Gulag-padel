@@ -749,7 +749,30 @@ function reignOf(log, pair){ // consecutive Tier 1 wins by this exact pair, most
   return r;
 }
 function crownCourt(c, log){ c.kotc=true; c.kings=[...c.a]; c.pairs=[[...c.a],[...c.b]]; c.face='kotc'; c.reign=Math.max(1,reignOf(log,c.a)); c.aLab='Kings'; c.bLab='Challengers'; }
+/* One-court nights: no winners up / losers off. Teams are reshuffled every game and the sit-outs rotate fairly:
+   whoever has sat out the fewest times sits next (ties: the one who sat out longest ago), so with 5 players everyone
+   sits out once every 5 games. The draw is seeded from the night and round, so the lineup check matches what you get. */
+function seededRand(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; }
+  return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); h^=h>>>16; return (h>>>0)/4294967296; }; }
+function rotateOneCourt(night){
+  const c=night.courts[0], R=night.round, rnd=seededRand(`${night.startedAt}|${R}|${[...c.a,...c.b,...night.bench].join(',')}`);
+  night.log.push({round:R, court:0, courts:1, pairs:c.pairs, score:c.score, winner:c.winner});
+  const pool=[...c.a,...c.b,...night.bench].filter(Boolean), sat=night.sitOut=night.sitOut||{}, last=night.lastSat=night.lastSat||{};
+  const known=pool.filter(p=>p in sat).map(p=>sat[p]), base=known.length?Math.min(...known):0;
+  pool.forEach(p=>{ if(!(p in sat)) sat[p]=base; }); // a late arrival starts level with the fewest sit-outs, not behind
+  night.bench.forEach(p=>{ sat[p]++; last[p]=R; });
+  const m=Math.max(0,pool.length-4), tie=new Map(pool.map(p=>[p,rnd()]));
+  const order=pool.slice().sort((x,y)=>(sat[x]||0)-(sat[y]||0) || (last[x]||0)-(last[y]||0) || tie.get(x)-tie.get(y));
+  const sitting=order.slice(0,m), on=pool.filter(p=>!sitting.includes(p));
+  // random teams, avoiding partnerships already played tonight where possible
+  const done={}; night.log.forEach(g=>(g.pairs||[]).forEach(pr=>{ const k=pairKey(pr); done[k]=(done[k]||0)+1; }));
+  const [w,x,y,z]=on, splits=[[[w,x],[y,z]],[[w,y],[x,z]],[[w,z],[x,y]]].map(sp=>({sp, cost:sp.reduce((t,pr)=>t+(done[pairKey(pr)]||0),0), r:rnd()}));
+  const pick=splits.sort((a,b)=>a.cost-b.cost || a.r-b.r)[0].sp.map(pr=>rnd()<.5?pr:[pr[1],pr[0]]);
+  night.courts=[{a:pick[0], b:pick[1], aLab:'Team', bLab:'Team', free:true, pairs:on.length===4?pick:null, face:'rotate', score:null, winner:null}];
+  night.bench=sitting; night.slam=null; night.leaveUndo=[]; night.carry=null; night.round++;
+}
 function advance(night){
+  if(night.courts.length===1 && [...night.courts[0].a,...night.courts[0].b].every(Boolean)) return rotateOneCourt(night);
   /* Courts still playing don't hold the night up: finished courts move on now, and a court whose players
      come from an unfinished game waits for that result (night.carry), then fills in when it's confirmed. */
   const C = night.courts, n=C.length, R=night.round, fin=c=>c.pairs && c.winner!=null, carry=[];
@@ -801,7 +824,7 @@ function resolveCarry(k){
   if(!K.courts.length) night.carry=null;
 }
 // Point slam: when the second sub spot would go to one of the pair who just lost in the gulag, they play each other for it (best of 3 points).
-function slamPair(N){ const b=N.bench; if(b.length<3 || !N.courts.length) return null; const x=b[1], y=b[2];
+function slamPair(N){ const b=N.bench; if(b.length<3 || N.courts.length<2) return null; const x=b[1], y=b[2];
   return (N.offPairs||[]).some(q=>(q[0]===x&&q[1]===y)||(q[0]===y&&q[1]===x)) ? [x,y] : null; }
 function slamState(N){ const pr=slamPair(N); if(!pr) return null;
   if(!N.slam || N.slam.pair.join('|')!==pr.join('|')) N.slam={pair:pr, score:[null,null]};
@@ -1226,8 +1249,8 @@ function courtView(c,i,n,ro){
     body = `<div class="slots"><div class="slot"><div class="lab">${esc(c.aLab)}</div><b>${c.a.map(x=>pb(x,ro)).join('<br>')}</b></div><div class="slot"><div class="lab">${esc(c.bLab)}</div><b>${c.b.map(x=>pb(x,ro)).join('<br>')}</b></div></div>
     ${ro?'':`<div class="opts"><div class="lab">Or pick the teams yourself</div>${opts}</div>`}`;
   } else {
-    const upHint = i===0||n===1 ? (c.kotc ? 'Kings: stay together on Tier 1' : 'Stays on Tier 1') : 'Levels up';
-    const downHint = g ? (night.bench.length?'Subbed off':'Stays in the gulag') : n===1 ? 'Stays on' : 'Drops a tier';
+    const upHint = n===1 ? 'Won' : i===0 ? (c.kotc ? 'Kings: stay together on Tier 1' : 'Stays on Tier 1') : 'Levels up';
+    const downHint = g ? (night.bench.length?'Subbed off':'Stays in the gulag') : n===1 ? 'Lost' : 'Drops a tier';
     body = c.pairs.map((pr,t)=>{
       const won=c.winner===t, lost=c.winner===1-t, sc=c.score&&c.score[t], king=c.kotc&&c.kings&&pairKey(pr)===pairKey(c.kings), streak=king&&c.reign>=2;
       const kHint = king ? `Kings${c.reign>=1?` · ${c.reign} win${c.reign>1?'s':''} in a row on Tier 1`:''}` : c.kotc ? 'Challengers' : 'Games won';
@@ -1479,7 +1502,7 @@ function liveView(ro){
   ${!ro && !K && night.planned && n<night.planned ? (night.bench.length>=4
     ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button></div>`
     : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Add latecomers as late arrivals below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
-  <div class="bench"><b>Gulag subs</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:'<br>The first two come on next'):'No subs waiting. Gulag losers stay on.'}</span>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
+  <div class="bench"><b>${n===1?'Sitting out':'Gulag subs'}</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:n===1?'<br>One court: teams are reshuffled every game and everyone takes turns sitting out':'<br>The first two come on next'):n===1?'Teams are reshuffled every game.':'No subs waiting. Gulag losers stay on.'}</span>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
   ${!ro&&nextOk?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round${early?` <small>(${playing} still playing)</small>`:''}</button>${early?`<p class="muted next-note">Courts that finished move on now. ${playing===1?'The game still going stays':'The games still going stay'} on screen to score.</p>`:''}`}</div>`
     :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
