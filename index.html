@@ -247,12 +247,12 @@ table.cmp tr.prov td{opacity:.65}
 table.ladder th,table.ladder td{white-space:nowrap}
 table.ladder .stick0{position:sticky;left:0;background:var(--bg);z-index:1;width:38px;min-width:38px;max-width:38px;box-sizing:border-box;padding-left:2px;padding-right:2px}
 table.ladder .stick1{position:sticky;left:38px;padding-right:12px;background:var(--bg);z-index:1;box-shadow:6px 0 6px -6px rgba(0,0,0,.25)}
-table.ladder tr.top .stick0,table.ladder tr.top .stick1{background:inherit}
 .sorth{font:inherit;text-transform:inherit;letter-spacing:inherit;color:inherit;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap}
 .sorth.on{color:var(--court);font-weight:800}
 table.ladder td.on{font-weight:800;color:var(--court)}
 table.ladder td.dim{opacity:.55}
-table.ladder tr.unranked td{opacity:.6}
+table.ladder tr.unranked td:not(.stick0):not(.stick1){opacity:.6}
+table.ladder tr.unranked td.stick0,table.ladder tr.unranked td.stick1{color:var(--muted)}
 table.ladder tr.ladder-split td{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:12px;opacity:1}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--court);text-decoration:underline;cursor:pointer}
 table.cmp tr.cmp-split td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:12px}
