@@ -243,6 +243,18 @@ table.cmp .num{text-align:right;white-space:nowrap}
 .cmp-sub{font-size:11px}
 .cmp-mv.up{color:#1a7f37;font-weight:700}.cmp-mv.down{color:#c0392b;font-weight:700}
 table.cmp tr.prov td{opacity:.65}
+.ladder-wrap{position:relative}
+table.ladder th,table.ladder td{white-space:nowrap}
+table.ladder .stick0{position:sticky;left:0;background:var(--bg);z-index:1;width:38px;min-width:38px;max-width:38px;box-sizing:border-box;padding-left:2px;padding-right:2px}
+table.ladder .stick1{position:sticky;left:38px;padding-right:12px;background:var(--bg);z-index:1;box-shadow:6px 0 6px -6px rgba(0,0,0,.25)}
+table.ladder tr.top .stick0,table.ladder tr.top .stick1{background:inherit}
+.sorth{font:inherit;text-transform:inherit;letter-spacing:inherit;color:inherit;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap}
+.sorth.on{color:var(--court);font-weight:800}
+table.ladder td.on{font-weight:800;color:var(--court)}
+table.ladder td.dim{opacity:.55}
+table.ladder tr.unranked td{opacity:.6}
+table.ladder tr.ladder-split td{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:12px;opacity:1}
+.linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--court);text-decoration:underline;cursor:pointer}
 table.cmp tr.cmp-split td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:12px}
 .rp{font:inherit;font-weight:700;background:none;border:1px dashed var(--muted);border-radius:6px;padding:2px 6px;color:inherit;cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .rp.sel{background:var(--ball);color:var(--ball-fg);border-style:solid}
@@ -715,43 +727,19 @@ function seeding(season, before){
   return Object.values(s).map(x=>({...x, seed:Math.round(x.seed), rating:Math.round(rate(h.elo,x.name))}))
     .sort((a,b)=> b.seed-a.seed || b.rating-a.rating || a.name.localeCompare(b.name));
 }
-/* ---------- ladder comparison (LM Tools preview; nothing here changes the live seeding) ---------- */
-let cmpMode='ppg';
-const CMP_MIN_NIGHTS=3;
-function ladderCompare(mode){
-  const season=currentSeason(), h=history(), now=Date.now(), cur=seeding(season), curRank={}; cur.forEach((x,i)=>curRank[x.name]=i+1);
+/* ---------- extra ladder stats: per-game and best-nights views of the same window as the seed points ---------- */
+const MIN_NIGHTS=3;
+function ladderStats(season){
+  season=season||currentSeason(); const h=history(), now=season.end?new Date(season.end).getTime():Date.now(), per={}, allG=[];
   const inSeason = nt => (!season.start || nt.date>=season.start) && (!season.end || nt.date<season.end);
-  const per={}, P=n=>per[n]=per[n]||{name:n, nights:[], pts:0, g:0, wg:0, wpts:0};
-  const allG=[];
   h.nights.forEach(({nt,st})=>{ if(!inSeason(nt)) return; const age=(now-new Date(nt.date))/DAY, wt=age<=S('fullWeeks')*7?1:age<=S('halfWeeks')*7?.5:0; if(!wt) return;
-    Object.values(st).forEach(r=>{ if(!r.g) return; const x=P(r.name); x.nights.push({pts:r.pts, g:r.g, wt}); x.wpts+=r.pts*wt; x.wg+=r.g*wt; allG.push(r.g); }); });
-  const avgG = allG.length ? allG.reduce((a,b)=>a+b,0)/allG.length : 5;
-  let rows=Object.values(per).map(x=>{
-    let val, show;
-    if(mode==='ppg'){ val=x.wg?x.wpts/x.wg:0; show=val.toFixed(1)+' pts/game'; }
-    else if(mode==='best'){ const sc=x.nights.map(n=>n.pts/n.g*avgG*n.wt).sort((a,b)=>b-a).slice(0,5); val=sc.reduce((a,b)=>a+b,0); show=Math.round(val)+' pts (best '+sc.length+')'; }
-    else { val=rate(h.elo,x.name); show=Math.round(val)+' rating'; }
-    return {name:x.name, val, show, nights:x.nights.length, games:x.nights.reduce((a,n)=>a+n.g,0), cur:curRank[x.name]||null};
-  });
-  const ok=rows.filter(r=>r.nights>=CMP_MIN_NIGHTS).sort((a,b)=>b.val-a.val || a.name.localeCompare(b.name));
-  const prov=rows.filter(r=>r.nights<CMP_MIN_NIGHTS).sort((a,b)=>b.val-a.val || a.name.localeCompare(b.name));
-  return {ok, prov, avgG};
+    Object.values(st).forEach(r=>{ if(!r.g) return; const x=per[r.name]=per[r.name]||{nights:[], wpts:0, wg:0}; x.nights.push({pts:r.pts, g:r.g, wt}); x.wpts+=r.pts*wt; x.wg+=r.g*wt; allG.push(r.g); }); });
+  const avgG = allG.length ? allG.reduce((a,b)=>a+b,0)/allG.length : 5, out={};
+  Object.entries(per).forEach(([n,x])=>{ const best=x.nights.map(k=>k.pts/k.g*avgG*k.wt).sort((a,b)=>b-a).slice(0,5);
+    out[n]={ppg:x.wg?x.wpts/x.wg:0, best:best.reduce((a,b)=>a+b,0), counted:x.nights.length}; });
+  return {stats:out, avgG};
 }
-function compareSection(){
-  const modes=[['ppg','Points per game'],['best','Best 5 nights'],['elo','Skill rating']], {ok,prov,avgG}=ladderCompare(cmpMode);
-  const expl={ppg:`Each player’s points divided by their games over the last ${S('fullWeeks')} weeks (weeks ${S('fullWeeks')+1}–${S('halfWeeks')} count half). Playing more doesn’t add up; playing better does.`,
-    best:`Each night is scored per game (scaled to an average night of ${avgG.toFixed(1)} games), then only each player’s best 5 nights count. Turning up helps until you have 5 good nights.`,
-    elo:`The hidden chess-style rating: up for beating stronger pairs, down for losing. Playing more makes it more accurate, not bigger.`}[cmpMode];
-  const row=(r,i,provisional)=>{ const nw=provisional?null:i+1, mv=nw&&r.cur?r.cur-nw:null;
-    return `<tr${provisional?' class="prov"':''}><td class="num">${nw||'–'}</td><td>${esc(r.name)}<div class="muted cmp-sub">${r.nights} night${r.nights===1?'':'s'} · ${r.games} games</div></td><td class="num">${r.show}</td><td class="num">${r.cur?'#'+r.cur:'–'}</td><td class="num cmp-mv ${mv>0?'up':mv<0?'down':''}">${mv==null?'':mv>0?'▲'+mv:mv<0?'▼'+(-mv):'='}</td></tr>`; };
-  return `<p class="muted">A preview using every saved night this season. Nothing changes on the Seeding page until you say so.</p>
-    <div class="seg cmp-seg">${modes.map(([k,l])=>`<button class="btn sm${cmpMode===k?' primary':''}" data-cmp="${k}">${l}</button>`).join('')}</div>
-    <p class="muted cmp-expl">${expl} Needs ${CMP_MIN_NIGHTS}+ nights in the window to be ranked; fewer shows as provisional.</p>
-    <div class="cmp-wrap"><table class="cmp"><thead><tr><th class="num">New</th><th>Player</th><th class="num">Score</th><th class="num">Now</th><th class="num">Move</th></tr></thead><tbody>
-    ${ok.map((r,i)=>row(r,i,false)).join('')||'<tr><td colspan="5" class="muted">Nobody has 3 nights in the window yet.</td></tr>'}
-    ${prov.length?`<tr class="cmp-split"><td colspan="5">Provisional (under ${CMP_MIN_NIGHTS} nights)</td></tr>${prov.map(r=>row(r,0,true)).join('')}`:''}
-    </tbody></table></div>`;
-}
+let seedSort={key:'seed', dir:-1};
 function tonightGames(){ return [...night.log, ...(night.carry?night.carry.courts.filter(g=>g.winner!=null):[]), ...night.courts.map((c,i)=>({round:night.round, court:i, courts:night.courts.length, pairs:c.pairs, score:c.score, winner:c.winner})).filter(g=>g.winner!=null)]; }
 function tonight(){ const elo={...history().elo}; return rank(playGames(tonightGames(), elo)); }
 
@@ -1458,7 +1446,6 @@ function lmView(){
   ${LMSEC('ratings','Starting ratings',ratings, rated.length?`${rated.length} set`:'')}
   ${LMSEC('nights',`Nights (${hs.length})`,nightsBody,'Edit scores or delete')}
   ${LMSEC('manual','Add a past night',addNight)}
-  ${LMSEC('compare','Fairer ladder: preview',compareSection(),'Compare before switching')}
   ${LMSEC('rules','Seeding settings',rules)}
   ${LMSEC('seasons','Seasons',seasons, esc(cs.name))}
   ${LMSEC('backup','Backup and export',backup)}
@@ -1649,9 +1636,25 @@ function seedView(){
     if(!was) return '<span class="mvx new" title="New to the seeding">New</span>';
     const d=was-now; return d>0?`<span class="mvx up" title="Up ${d} since last week">▲${d}</span>`:d<0?`<span class="mvx down" title="Down ${-d} since last week">▼${-d}</span>`:'<span class="mvx same" title="No change">–</span>'; };
   if(!t.length) return `<h2>Seeding</h2>${refBar()}<div class="banner">Seeding fills in once the first night is saved.</div>`;
-  return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">${past.length?`${esc(cs.name)}. `:''}Points from the last ${S('fullWeeks')} weeks count in full and weeks ${S('fullWeeks')+1} to ${S('halfWeeks')} count half, so regulars who keep winning rise and a one-off big night fades. Beating a stronger team earns up to ${S('upset')} bonus points. Rating shows current strength.</p>
-  <div class="tablewrap"><table><thead><tr><th></th><th class="mvh" title="Change since last week">+/–</th><th>Player</th><th class="n">Seed pts</th><th class="n">Nights</th><th class="n">W–L</th><th class="n">Rating</th><th></th></tr></thead><tbody>
-  ${t.map((r,i)=>`<tr class="${i===0&&r.seed?'top':''}"><td class="rank">${r.seed?i+1:'–'}</td><td class="mvc">${r.seed?moveCell(r.name,i+1):''}</td><td>${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`<span class="pname">${esc(r.name)}</span>${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td><td class="n">${pts(r.seed)}</td><td class="n">${r.n}</td><td class="n">${r.w}–${r.g-r.w}</td><td class="n">${r.rating}</td><td></td></tr>`).join('')}
+  const {stats:LS, avgG}=ladderStats(), seedPos={}; t.forEach((r,i)=>seedPos[r.name]=i+1);
+  t.forEach(r=>{ const x=LS[r.name]||{ppg:0,best:0,counted:0}; Object.assign(r,{ppg:x.ppg, best:x.best, counted:x.counted, winp:r.g?r.w/r.g:0}); });
+  const K=seedSort.key, perGame=['ppg','best','rating','winp'].includes(K); // fair-play views need a few nights before a player is ranked
+  const val=r=>K==='name'?r.name:K==='wl'?r.w-(r.g-r.w):K==='n'?r.n:r[K];
+  const ok=r=>K==='seed'?r.seed>0:perGame?r.counted>=MIN_NIGHTS:r.g>0;
+  const rows=t.slice().sort((a,b)=> (ok(b)-ok(a)) || (K==='name'?a.name.localeCompare(b.name)*seedSort.dir:(val(a)-val(b))*seedSort.dir) || (seedPos[a.name]-seedPos[b.name]));
+  const COLS=[['seed','Seed pts','Points from the last '+S('fullWeeks')+' weeks (older weeks half). The official ladder.'],['ppg','Pts/game','Seed points per game played. Playing more doesn’t add up; playing better does.'],
+    ['best','Best 5','Best 5 nights, each scored per game (scaled to an average night of '+avgG.toFixed(1)+' games).'],['rating','Rating','Skill rating: up for beating stronger pairs, down for losing.'],
+    ['winp','Win %','Share of games won this season.'],['wl','W–L','Wins and losses this season.'],['n','Nights','Nights in the last '+S('halfWeeks')+' weeks.']];
+  const th=([k,l,tip])=>`<th class="n"><button class="sorth${K===k?' on':''}" data-sort="${k}" title="${esc(tip)}">${l}${K===k?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>`;
+  const cell=(k,r)=>{ const dim=!ok(r)&&K===k?' dim':'', on=K===k?' on':'';
+    const v= k==='seed'?pts(r.seed) : k==='ppg'?(r.counted?r.ppg.toFixed(1):'–') : k==='best'?(r.counted?Math.round(r.best):'–') : k==='rating'?r.rating : k==='winp'?(r.g?Math.round(r.winp*100)+'%':'–') : k==='wl'?`${r.w}–${r.g-r.w}` : r.n;
+    return `<td class="n${on}${dim}">${v}</td>`; };
+  const expl=Object.fromEntries(COLS.map(c=>[c[0],c[2]]));
+  let pos=0;
+  return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">${past.length?`${esc(cs.name)}. `:''}${K==='seed'?`Points from the last ${S('fullWeeks')} weeks count in full and weeks ${S('fullWeeks')+1} to ${S('halfWeeks')} count half, so regulars who keep winning rise and a one-off big night fades. Beating a stronger team earns up to ${S('upset')} bonus points.`:`Sorted by <b>${esc(COLS.find(c=>c[0]===K)?COLS.find(c=>c[0]===K)[1]:'name')}</b>. ${esc(expl[K]||'')}${perGame?` Players need ${MIN_NIGHTS}+ nights in the window to be ranked this way.`:''} <button class="linkbtn" data-sort="seed">Back to seed points</button>`} Tap a column heading to sort by it.</p>
+  <div class="tablewrap ladder-wrap"><table class="ladder"><thead><tr><th class="stick0"></th>${K==='seed'?'<th class="mvh" title="Change since last week">+/–</th>':''}<th class="stick1"><button class="sorth${K==='name'?' on':''}" data-sort="name">Player${K==='name'?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>${COLS.map(th).join('')}<th></th></tr></thead><tbody>
+  ${rows.map(r=>{ const ranked=ok(r), n=ranked?++pos:null; const split=!ranked&&perGame&&!rows.__split?(rows.__split=1,`<tr class="ladder-split"><td colspan="12">Under ${MIN_NIGHTS} nights</td></tr>`):'';
+    return `${split}<tr class="${n===1&&K==='seed'?'top':''}${!ranked?' unranked':''}"><td class="rank stick0">${n||'–'}</td>${K==='seed'?`<td class="mvc">${r.seed?moveCell(r.name,n):''}</td>`:''}<td class="stick1">${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`<span class="pname">${esc(r.name)}</span>${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td>${COLS.map(c=>cell(c[0],r)).join('')}<td></td></tr>`; }).join('')}
   </tbody></table></div>
   <div class="actions">${!unlocked?'':`<button class="btn${editNames?' primary':''}" id="editnames">${editNames?'Done editing':'Edit names'}</button>${editNames?'<span class="muted">Tap Rename to fix a spelling, </span>':''}`}</div>
   ${(()=>{ const cs=currentSeason(), A=(settings.adjust||[]).filter(a=>!cs.start||a.at>=cs.start); return A.length?`<p class="muted adj-note">Includes point adjustments: ${A.map(a=>`${esc(a.name)} ${a.pts>0?'+':''}${a.pts}${a.reason?` (${esc(a.reason)})`:''}`).join(', ')}.</p>`:''; })()}
@@ -1821,7 +1824,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
-  else if(d.cmp){ cmpMode=d.cmp; render(); }
+  else if(d.sort){ seedSort = seedSort.key===d.sort ? {key:d.sort, dir:-seedSort.dir} : {key:d.sort, dir:d.sort==='name'?1:-1}; render(); }
   else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
   else if(t.id==='ann-cancel'){ annDraft=null; annEditId=null; lmMsg.ann=null; render(); }
   else if(t.id==='ann-save') saveAnn();
