@@ -728,7 +728,10 @@ function seeding(season, before){
     .sort((a,b)=> b.seed-a.seed || b.rating-a.rating || a.name.localeCompare(b.name));
 }
 /* ---------- extra ladder stats: per-game and best-nights views of the same window as the seed points ---------- */
-const MIN_NIGHTS=3;
+// how many nights a player needs before the per-game columns rank them: grows with the league (1 night early on, up to 3)
+function minNights(){ const cs=currentSeason(), cut=Date.now()-S('halfWeeks')*7*DAY;
+  const n=nights.filter(nt=>(!cs.start||nt.date>=cs.start) && new Date(nt.date).getTime()>=cut).length;
+  return n>=6?3:n>=3?2:1; }
 function ladderStats(season, before, h){
   season=season||currentSeason(); h=h||history(); const now=before?new Date(before).getTime():season.end?new Date(season.end).getTime():Date.now(), per={}, allG=[];
   const inSeason = nt => (!season.start || nt.date>=season.start) && (!season.end || nt.date<season.end) && (!before || nt.date<before);
@@ -1643,7 +1646,7 @@ function seedView(){
   enrich(t,null);
   const K=seedSort.key, perGame=['ppg','best','rating','winp'].includes(K); // fair-play views need a few nights before a player is ranked
   const valOf=(r,k)=>k==='name'?r.name:k==='wl'?r.w-(r.g-r.w):k==='n'?r.n:r[k], val=r=>valOf(r,K);
-  const okFor=(r,k)=>k==='seed'?r.seed>0:['ppg','best','rating','winp'].includes(k)?r.counted>=MIN_NIGHTS:r.g>0, ok=r=>okFor(r,K);
+  const MIN_NIGHTS=minNights(), okFor=(r,k)=>k==='seed'?r.seed>0:['ppg','best','rating','winp'].includes(k)?r.counted>=MIN_NIGHTS:r.g>0, ok=r=>okFor(r,K);
   const order=(rows,k,dir)=>rows.slice().sort((a,b)=> (okFor(b,k)-okFor(a,k)) || (k==='name'?a.name.localeCompare(b.name)*dir:(valOf(a,k)-valOf(b,k))*dir) || (a.seedPos-b.seedPos));
   const rows=order(t,K,seedSort.dir);
   // movement since last week in this column: best-first position now vs just before the latest night
