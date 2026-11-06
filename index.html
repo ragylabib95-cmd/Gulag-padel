@@ -245,15 +245,15 @@ table.cmp .num{text-align:right;white-space:nowrap}
 table.cmp tr.prov td{opacity:.65}
 .ladder-wrap{position:relative}
 table.ladder th,table.ladder td{white-space:nowrap}
-table.ladder .stick0{position:sticky;left:0;background:var(--bg);z-index:1;width:38px;min-width:38px;max-width:38px;box-sizing:border-box;padding-left:2px;padding-right:2px}
-table.ladder .stick1{position:sticky;left:38px;padding-right:12px;background:var(--bg);z-index:1;box-shadow:6px 0 6px -6px rgba(0,0,0,.25)}
+table.ladder .stick0{position:sticky;left:0;background:var(--bg);z-index:2;transform:translateZ(0);width:38px;min-width:38px;max-width:38px;box-sizing:border-box;padding-left:2px;padding-right:2px}
+table.ladder .stick1{position:sticky;left:38px;padding-right:12px;background:var(--bg);z-index:2;transform:translateZ(0);box-shadow:6px 0 6px -6px rgba(0,0,0,.25)}
 .sorth{font:inherit;text-transform:inherit;letter-spacing:inherit;color:inherit;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap}
 .sorth.on{color:var(--court);font-weight:800}
 table.ladder td.on{font-weight:800;color:var(--court)}
-table.ladder td.dim{opacity:.55}
-table.ladder tr.unranked td:not(.stick0):not(.stick1){opacity:.6}
-table.ladder tr.unranked td.stick0,table.ladder tr.unranked td.stick1{color:var(--muted)}
-table.ladder tr.ladder-split td{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:12px;opacity:1}
+table.ladder td.dim{color:var(--muted)}
+table.ladder tr.unranked td,table.ladder tr.unranked td.on{color:var(--muted);font-weight:400}
+table.ladder tr.ladder-split td{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:12px}
+table.ladder tr.ladder-split td span{position:sticky;left:4px}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--court);text-decoration:underline;cursor:pointer}
 table.cmp tr.cmp-split td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:12px}
 .rp{font:inherit;font-weight:700;background:none;border:1px dashed var(--muted);border-radius:6px;padding:2px 6px;color:inherit;cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
@@ -1653,7 +1653,7 @@ function seedView(){
   let pos=0;
   return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">${past.length?`${esc(cs.name)}. `:''}${K==='seed'?`Points from the last ${S('fullWeeks')} weeks count in full and weeks ${S('fullWeeks')+1} to ${S('halfWeeks')} count half, so regulars who keep winning rise and a one-off big night fades. Beating a stronger team earns up to ${S('upset')} bonus points.`:`Sorted by <b>${esc(COLS.find(c=>c[0]===K)?COLS.find(c=>c[0]===K)[1]:'name')}</b>. ${esc(expl[K]||'')}${perGame?` Players need ${MIN_NIGHTS}+ nights in the window to be ranked this way.`:''} <button class="linkbtn" data-sort="seed">Back to seed points</button>`} Tap a column heading to sort by it.</p>
   <div class="tablewrap ladder-wrap"><table class="ladder"><thead><tr><th class="stick0"></th>${K==='seed'?'<th class="mvh" title="Change since last week">+/–</th>':''}<th class="stick1"><button class="sorth${K==='name'?' on':''}" data-sort="name">Player${K==='name'?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>${COLS.map(th).join('')}<th></th></tr></thead><tbody>
-  ${rows.map(r=>{ const ranked=ok(r), n=ranked?++pos:null; const split=!ranked&&perGame&&!rows.__split?(rows.__split=1,`<tr class="ladder-split"><td colspan="12">Under ${MIN_NIGHTS} nights</td></tr>`):'';
+  ${rows.map(r=>{ const ranked=ok(r), n=ranked?++pos:null; const split=!ranked&&perGame&&!rows.__split?(rows.__split=1,`<tr class="ladder-split"><td colspan="12"><span>Under ${MIN_NIGHTS} nights</span></td></tr>`):'';
     return `${split}<tr class="${n===1&&K==='seed'?'top':''}${!ranked?' unranked':''}"><td class="rank stick0">${n||'–'}</td>${K==='seed'?`<td class="mvc">${r.seed?moveCell(r.name,n):''}</td>`:''}<td class="stick1">${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`<span class="pname">${esc(r.name)}</span>${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td>${COLS.map(c=>cell(c[0],r)).join('')}<td></td></tr>`; }).join('')}
   </tbody></table></div>
   <div class="actions">${!unlocked?'':`<button class="btn${editNames?' primary':''}" id="editnames">${editNames?'Done editing':'Edit names'}</button>${editNames?'<span class="muted">Tap Rename to fix a spelling, </span>':''}`}</div>
