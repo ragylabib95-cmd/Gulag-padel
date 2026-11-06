@@ -244,6 +244,12 @@ table.cmp .num{text-align:right;white-space:nowrap}
 .cmp-mv.up{color:#1a7f37;font-weight:700}.cmp-mv.down{color:#c0392b;font-weight:700}
 table.cmp tr.prov td{opacity:.65}
 table.cmp tr.cmp-split td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:12px}
+.rp{font:inherit;font-weight:700;background:none;border:1px dashed var(--muted);border-radius:6px;padding:2px 6px;color:inherit;cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.rp.sel{background:var(--ball);color:var(--ball-fg);border-style:solid}
+.rp.drop{outline:2px dashed var(--court);outline-offset:2px}
+.rp.lifted{opacity:.35}
+.rsubs{border:2px solid var(--ball);border-radius:10px;padding:8px 10px;margin:0 0 12px}
+.rsubs p{margin:0 0 6px}
 .mv-busy{background:var(--ball);color:var(--ball-fg);opacity:.75}
 .nx-wait{color:var(--muted);font-style:italic;font-weight:500}
 .carry{border:2px dashed var(--ball);border-radius:12px;padding:10px;margin:0 0 16px}
@@ -1089,13 +1095,14 @@ function swapPlayers(x,y){
 (function(){
   /* Phones use touch events (iOS Safari cancels pointer events once a finger moves), mice use pointer events. */
   let drag=null, eatClick=false;
-  const SEL='.live-drag .pbtn[data-player]';
-  const targetAt=(x,y,p)=>{ const el=document.elementFromPoint(x,y); const b=el&&el.closest(SEL); return b && b.dataset.player!==p ? b : null; };
-  const clear=()=>document.querySelectorAll('.pbtn.drop').forEach(b=>b.classList.remove('drop'));
+  const SEL='.live-drag .pbtn[data-player], .rdrag .rp[data-rp]', keyOf=b=>b.dataset.player||b.dataset.rp;
+  const targetAt=(x,y,p)=>{ const el=document.elementFromPoint(x,y); const b=el&&el.closest(SEL); return b && keyOf(b)!==p && !!b.dataset.rp===!!drag0.rp ? b : null; };
+  let drag0={};
+  const clear=()=>document.querySelectorAll('.drop').forEach(b=>b.classList.remove('drop'));
   function begin(b,x,y){
-    drag={p:b.dataset.player, x0:x, y0:y, lastX:x, lastY:y, src:b, active:false};
+    drag0={rp:!!b.dataset.rp}; drag={p:keyOf(b), name:b.textContent, x0:x, y0:y, lastX:x, lastY:y, src:b, active:false};
     drag.timer=setTimeout(()=>{ if(!drag || drag.active) return; drag.active=true; document.body.classList.add('dragging'); b.classList.add('lifted');
-      const g=document.createElement('div'); g.className='drag-ghost p-ghost'; g.textContent=drag.p; document.body.appendChild(g); drag.ghost=g;
+      const g=document.createElement('div'); g.className='drag-ghost p-ghost'; g.textContent=drag.name; document.body.appendChild(g); drag.ghost=g;
       place(drag.lastX, drag.lastY);
       try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){}
       drag.scroller=setInterval(()=>{ if(!drag) return; const H=window.innerHeight; if(drag.lastY<70) window.scrollBy(0,-12); else if(drag.lastY>H-70) window.scrollBy(0,12); },16);
@@ -1112,7 +1119,7 @@ function swapPlayers(x,y){
     if(!d.active) return false;
     eatClick=true; setTimeout(()=>{ eatClick=false; }, 500);
     if(d.ghost) d.ghost.remove(); clear(); document.body.classList.remove('dragging'); d.src.classList.remove('lifted');
-    if(!cancel){ const t=targetAt(x,y,d.p); if(t) swapPlayers(d.p, t.dataset.player); }
+    if(!cancel){ const t=targetAt(x,y,d.p); if(t){ if(t.dataset.rp) swapDraft(d.p, t.dataset.rp); else swapPlayers(d.p, t.dataset.player); } }
     return true;
   }
   // touch
@@ -1334,22 +1341,34 @@ function roundTabs(){
 }
 const fmtScore = g => g.score&&g.score[0]!=null&&g.score[1]!=null ? `${g.score[0]}–${g.score[1]}` : '–';
 function flipsIn(draft){ return draft.filter(g=>{ const o=night.log.find(x=>x.round===g.round&&x.court===g.court); return o && o.winner!=null && g.winner!=null && o.winner!==g.winner; }); }
+const origGame = g => night.log.find(x=>x.round===g.round&&x.court===g.court);
+function teamsChangedIn(draft){ return draft.filter(g=>{ const o=origGame(g); return o && JSON.stringify(o.pairs)!==JSON.stringify(g.pairs); }); }
+// names in a round being fixed: tap one then another (or drag one onto another) to swap; or swap in someone who sat that round out
+let rSel=null;
+function rSlot(k){ const [gi,t,j]=k.split(':').map(Number); return {g:rDraft[gi], t, j}; }
+function swapDraft(k1,k2){ if(!rDraft || k1===k2) return; const A=rSlot(k1), B=rSlot(k2); if(!A.g||!B.g) return;
+  const x=A.g.pairs[A.t][A.j]; A.g.pairs[A.t][A.j]=B.g.pairs[B.t][B.j]; B.g.pairs[B.t][B.j]=x; rSel=null; rErr=''; render(); }
+function tonightPlayers(){ const s=new Set(); night.log.forEach(g=>(g.pairs||[]).flat().forEach(p=>p&&s.add(p))); night.courts.forEach(c=>[...c.a,...c.b].forEach(p=>p&&s.add(p)));
+  night.bench.forEach(p=>s.add(p)); (night.carry?night.carry.courts:[]).forEach(g=>g.pairs.flat().forEach(p=>s.add(p))); return [...s]; }
+function satOutOf(draft){ const inR=new Set(draft.flatMap(g=>g.pairs.flat())); return tonightPlayers().filter(p=>!inR.has(p)).sort((a,b)=>a.localeCompare(b)); }
 function canRedoLineup(r){ return r===night.round-1 && (night.undo||[]).length && !night.courts.some(c=>c.score&&(c.score[0]!=null||c.score[1]!=null)); }
 function pastRoundView(){
   const r=viewRound, editing=!!rDraft, games=(editing?rDraft:night.log.filter(g=>g.round===r)).slice().sort((a,b)=>a.court-b.court);
   let bar;
   if(editing && confirming==='flip'){
-    const F=flipsIn(rDraft), redo=canRedoLineup(r);
-    bar=`<div class="confirm"><p><b>This changes who won.</b></p>${F.map(g=>`<p>${courtName(g.court,g.courts||1)}: ${esc(tm(g.pairs[g.winner]))} now beat ${esc(tm(g.pairs[1-g.winner]))} ${fmtScore({score:[g.score[g.winner],g.score[1-g.winner]]})}.</p>`).join('')}
+    const F=flipsIn(rDraft), Tc=teamsChangedIn(rDraft).filter(g=>!F.includes(g)), redo=canRedoLineup(r);
+    bar=`<div class="confirm"><p><b>${F.length&&Tc.length?'This changes who played and who won.':F.length?'This changes who won.':'This changes who played.'}</b></p>${[...F,...Tc].sort((a,b)=>a.court-b.court).map(g=>`<p>${courtName(g.court,g.courts||1)}: ${esc(tm(g.pairs[g.winner]))} beat ${esc(tm(g.pairs[1-g.winner]))} ${fmtScore({score:[g.score[g.winner],g.score[1-g.winner]]})}.</p>`).join('')}
       <p>Tonight’s ranking updates either way. ${redo?`Round ${night.round} hasn’t started scoring, so you can also redo its lineup with the corrected result.`:`Later rounds were already set up from the old result, so nobody will be moved.`}</p>
       <div class="row">${redo?`<button class="btn primary" id="rsave-redo">Save and redo round ${night.round} lineup</button>`:''}<button class="btn${redo?'':' primary'}" id="rsave-keep">Save${redo?', keep lineup':''}</button><button class="btn" id="rflip-back">Back</button></div></div>`;
-  } else if(editing) bar=`<div class="edit-bar"><span class="muted">Fixing round ${r}. Round ${night.round} stays as it is.</span><div class="row"><button class="btn primary sm" id="rsave">Save changes</button><button class="btn sm" id="rcancel">Cancel</button></div>${rErr?`<p class="err-text">${esc(rErr)}</p>`:''}</div>`;
+  } else if(editing) bar=`<div class="edit-bar"><span class="muted">Fixing round ${r}. Change scores, or tap a name and then another to swap them (or press, hold and drag). Round ${night.round} stays as it is.</span><div class="row"><button class="btn primary sm" id="rsave">Save changes</button><button class="btn sm" id="rcancel">Cancel</button></div>${rErr?`<p class="err-text">${esc(rErr)}</p>`:''}</div>`;
   else if(lockPrompt==='round') bar=`<form class="edit-bar" id="pwform"><label for="pw">Password to edit scores</label><div class="row"><input id="pw" type="password" autocomplete="off"><button class="btn primary sm" type="submit">Unlock</button><button class="btn sm" type="button" id="pwcancel">Cancel</button></div>${pwErr?`<p class="err-text">${esc(pwErr)}</p>`:''}</form>`;
   else bar=`<div class="edit-bar"><button class="btn sm" id="redit">Edit round ${r} scores</button></div>`;
   const cards=games.map(g=>{ const n=g.courts||1, gi=editing?rDraft.indexOf(g):-1;
     return `<section class="court${n>1&&g.court===n-1?' gulag':''}"><div class="court-head"><span class="name">${courtName(g.court,n)}</span><span class="state">${editing?'Editing':'Final '+fmtScore(g)}</span></div>
-    ${g.pairs.map((pr,t)=>`<div class="team${g.winner===t?' won':''}"><div class="tn"><b>${pr.map(nm).join(' &amp; ')}</b><span class="hint">${g.winner===t?'Won':g.winner===1-t?'Lost':'Games won'}</span></div>${editing?`<div class="sc">${[0,1,2,3].map(v=>`<button class="sv${g.score&&g.score[t]===v?' on':''}" data-rscore="${gi}:${t}:${v}" aria-pressed="${!!(g.score&&g.score[t]===v)}">${v}</button>`).join('')}</div>`:`<span class="g-score big">${g.score&&g.score[t]!=null?g.score[t]:'–'}</span>`}</div>`).join('')}</section>`; }).join('');
-  return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${r}</h2><button class="btn sm" data-vround="live">Back to round ${night.round}</button></div>${bar}${cards}`;
+    ${g.pairs.map((pr,t)=>`<div class="team${g.winner===t?' won':''}"><div class="tn"><b>${editing?pr.map((p,j)=>{ const k=`${gi}:${t}:${j}`; return `<button class="rp${rSel===k?' sel':''}" data-rp="${k}">${esc(p)}</button>`; }).join(' &amp; '):pr.map(nm).join(' &amp; ')}</b><span class="hint">${g.winner===t?'Won':g.winner===1-t?'Lost':'Games won'}</span></div>${editing?`<div class="sc">${[0,1,2,3].map(v=>`<button class="sv${g.score&&g.score[t]===v?' on':''}" data-rscore="${gi}:${t}:${v}" aria-pressed="${!!(g.score&&g.score[t]===v)}">${v}</button>`).join('')}</div>`:`<span class="g-score big">${g.score&&g.score[t]!=null?g.score[t]:'–'}</span>`}</div>`).join('')}</section>`; }).join('');
+  const outs=editing&&rSel?satOutOf(rDraft):[], selName=editing&&rSel&&rSlot(rSel).g?rSlot(rSel).g.pairs[rSlot(rSel).t][rSlot(rSel).j]:'';
+  const subs=editing&&rSel&&confirming!=='flip'?`<div class="rsubs"><p><b>${esc(selName)}</b>: tap another name above to swap${outs.length?', or put in someone who sat out this round:':'.'}</p>${outs.length?`<div class="row">${outs.map(p=>`<button class="btn sm" data-rsub="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}</div>`:'';
+  return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${r}</h2><button class="btn sm" data-vround="live">Back to round ${night.round}</button></div>${bar}${subs}<div class="${editing&&confirming!=='flip'?'rdrag':''}">${cards}</div>`;
 }
 /* ---------- LM tools (league manager), password protected ---------- */
 let restorePlan=null, pendingSeason='', lmErr='', lmMsg={}, lmOpen=new Set(['players']), mergeSel=['',''], manual=null, showAllLog=false;
@@ -1513,19 +1532,24 @@ async function download(kind){
   catch(e){ lmMsg.backup={t:'Couldn’t download the file. Try again.',err:true}; }
   render();
 }
-function startRoundEdit(){ rDraft=JSON.parse(JSON.stringify(night.log.filter(g=>g.round===viewRound))); rErr=''; confirming=null; render(); }
+function startRoundEdit(){ rSel=null; rDraft=JSON.parse(JSON.stringify(night.log.filter(g=>g.round===viewRound))); rErr=''; confirming=null; render(); }
 function saveRound(redo){
   if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; confirming=null; render(); return; }
   const r=viewRound;
+  rSel=null;
+  rDraft.forEach(g=>{ const o=origGame(g); if(o && JSON.stringify(o.pairs)!==JSON.stringify(g.pairs)) logScore(`Fixed round ${r}, ${courtName(g.court,g.courts||1)} teams: ${o.pairs.map(tm).join(' v ')} to ${g.pairs.map(tm).join(' v ')}`); });
   rDraft.forEach(g=>{ const o=night.log.find(x=>x.round===r&&x.court===g.court); if(o && JSON.stringify(o.score)!==JSON.stringify(g.score)) logScore(`Fixed round ${r}, ${courtName(g.court,g.courts||1)}: ${fmtRes(o.pairs,o.score)} to ${fmtRes(g.pairs,g.score)}${o.winner!==g.winner?' (winner changed)':''}${redo&&o.winner!==g.winner?', lineup redrawn':''}`); });
   if(redo && canRedoLineup(r)){
     const u=night.undo.slice(), prev=JSON.parse(u.pop());
-    rDraft.forEach(g=>{ const c=prev.courts[g.court]; if(c){ c.score=g.score; c.winner=g.winner; } });
+    const before=new Set(prev.courts.flatMap(c=>c.pairs?c.pairs.flat():[...c.a,...c.b]));
+    rDraft.forEach(g=>{ const c=prev.courts[g.court]; if(!c) return; const o=origGame(g);
+      g.pairs.forEach((pr,t)=>pr.forEach((p,j)=>{ const old=o.pairs[t][j]; if(p!==old && !before.has(p)){ prev.bench=prev.bench.map(x=>x===p?old:x); } })); // someone who sat out played instead
+      c.pairs=JSON.parse(JSON.stringify(g.pairs)); c.a=[...g.pairs[0]]; c.b=[...g.pairs[1]]; c.score=g.score; c.winner=g.winner; });
     prev.undo=u; night=fix(prev); rDraft=null; viewRound=null; confirming=null;
     nextRound(); logChange(`Fixed round ${r} scores and redrew round ${night.round}`); setStatus(`Round ${r} fixed and round ${night.round} redrawn`); return;
   }
   night.log = night.log.map(x=> x.round===r ? (rDraft.find(g=>g.court===x.court)||x) : x);
-  logChange(`Fixed round ${r} scores during the night`); rDraft=null; confirming=null; saveNight(); render(); setStatus(`Round ${r} scores updated`);
+  logChange(`Fixed round ${r} ${teamsChangedIn(rDraft).length?'teams and scores':'scores'} during the night`); rDraft=null; confirming=null; saveNight(); render(); setStatus(`Round ${r} scores updated`);
 }
 
 function liveView(ro){
@@ -1861,9 +1885,11 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='rm-no'){ confirming=null; render(); }
   else if(d.vround!=null){ viewRound = d.vround==='live' ? null : +d.vround; rDraft=null; rErr=''; confirming=null; lockPrompt=null; render(); window.scrollTo(0,0); }
   else if(t.id==='redit'){ if(ref) startRoundEdit(); }
-  else if(t.id==='rcancel'){ rDraft=null; rErr=''; confirming=null; render(); }
+  else if(t.id==='rcancel'){ rSel=null; rDraft=null; rErr=''; confirming=null; render(); }
   else if(d.rscore){ const [gi,tm2,v]=d.rscore.split(':').map(Number); setScore(rDraft[gi],tm2,v); rErr=''; render(); }
-  else if(t.id==='rsave'){ if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; render(); } else if(flipsIn(rDraft).length){ confirming='flip'; render(); window.scrollTo(0,0); } else saveRound(false); }
+  else if(d.rp && rDraft){ if(!rSel){ rSel=d.rp; render(); } else if(rSel===d.rp){ rSel=null; render(); } else swapDraft(rSel,d.rp); }
+  else if(d.rsub && rDraft && rSel){ const A=rSlot(rSel); if(A.g){ A.g.pairs[A.t][A.j]=d.rsub; } rSel=null; render(); }
+  else if(t.id==='rsave'){ if(rDraft.some(g=>g.winner==null)){ rErr='Each game needs one team on 3.'; render(); } else if(flipsIn(rDraft).length || teamsChangedIn(rDraft).length){ confirming='flip'; render(); window.scrollTo(0,0); } else saveRound(false); }
   else if(t.id==='rsave-keep') saveRound(false);
   else if(t.id==='rsave-redo') saveRound(true);
   else if(t.id==='rflip-back'){ confirming=null; render(); }
