@@ -677,8 +677,8 @@ const saveRoster = () => write('club/roster', {players:roster});
    moved more by bigger score margins. */
 const avg = (r,t) => (rate(r,t[0])+rate(r,t[1]))/2;
 const rate = (r,p) => r[p] ?? ((settings.ratings||{})[p] ?? 1000);
-function playGames(games, elo, stats){
-  const st = stats || {};
+function playGames(games, elo, stats, excused){
+  const st = stats || {}, skip = new Set(excused||[]); // excused players: that night doesn't count for them (no points, no rating change)
   const get = p => st[p] = st[p] || {name:p, pts:0, w:0, g:0, gw:0, gl:0, top:0};
   games.slice().sort((x,y)=> x.round-y.round || x.court-y.court).forEach(g=>{
     if(g.winner==null || !g.pairs) return;
@@ -688,6 +688,7 @@ function playGames(games, elo, stats){
     const mult = 1 + 0.25*(Math.max(1,Math.abs(sc[0]-sc[1]))-1);
     const delta = [0,1].map(t=> 24*mult*((t===g.winner?1:0)-E[t]));
     [0,1].forEach(t=> g.pairs[t].forEach(p=>{
+      if(skip.has(p)) return;
       const s=get(p), win=t===g.winner;
       s.g++; s.gw+=sc[t]; s.gl+=sc[1-t]; if(g.court===0) s.top++;
       s.pts += sc[t];
@@ -698,14 +699,14 @@ function playGames(games, elo, stats){
       // gulag penalty: losing in the gulag costs points from round 3 on
       else if((g.courts||1)>1 && g.court===(g.courts||1)-1 && g.round>2){ s.pts -= S('gulagLoss'); s.gpen=(s.gpen||0)+S('gulagLoss'); }
     }));
-    [0,1].forEach(t=> g.pairs[t].forEach(p=> elo[p]=rate(elo,p)+delta[t]));
+    [0,1].forEach(t=> g.pairs[t].forEach(p=>{ if(!skip.has(p)) elo[p]=rate(elo,p)+delta[t]; }));
   });
   Object.values(st).forEach(x=>{ if(x.pts<0) x.pts=0; }); // nobody finishes a night below zero
   return st;
 }
 const rank = st => Object.values(st).sort((x,y)=> y.pts-x.pts || y.w-x.w || (y.gw-y.gl)-(x.gw-x.gl) || x.name.localeCompare(y.name));
 function history(){ // chronological replay of every saved night
-  const elo={}; const out=nights.slice().sort((a,b)=> a.date<b.date?-1:1).map(nt=>{ const before={...elo}; return {nt, before, st:playGames(nt.games||[], elo)}; });
+  const elo={}; const out=nights.slice().sort((a,b)=> a.date<b.date?-1:1).map(nt=>{ const before={...elo}; return {nt, before, st:playGames(nt.games||[], elo, null, nt.excused)}; });
   return {elo, nights:out};
 }
 // Seeding: points from the last 10 weeks count in full, weeks 11-20 count half. Turning up and winning steadily beats one big night.
@@ -1449,6 +1450,7 @@ function lmView(){
   ${LMSEC('ratings','Starting ratings',ratings, rated.length?`${rated.length} set`:'')}
   ${LMSEC('nights',`Nights (${hs.length})`,nightsBody,'Edit scores or delete')}
   ${LMSEC('manual','Add a past night',addNight)}
+  ${LMSEC('excuse','Don’t count a night for a player',excuseSection(),'Unwell or injured')}
   ${LMSEC('rules','Seeding settings',rules)}
   ${LMSEC('seasons','Seasons',seasons, esc(cs.name))}
   ${LMSEC('backup','Backup and export',backup)}
@@ -1698,8 +1700,28 @@ function historyView(){
   return `<h2>History</h2>` + h.map(({nt,st})=>{
     const r=rank(st), editing=false, open=false, tools='';
     return `<details class="night"${open||sumOpen===nt.date?' open':''}><summary><b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b><span class="muted">${nt.venue&&VENUES[nt.venue]?esc(VENUES[nt.venue].name)+' · ':''}${nt.players.length} players · ${nt.rounds} rounds${r[0]?` · Top: ${esc(r[0].name)}`:''}</span></summary>
-    ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}`}${tools}${gameLog(nt, editing)}</details>`;
+    ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}${(nt.excused||[]).length?`<p class="muted excused-note">Not counted for ${nt.excused.map(esc).join(', ')} (excused by the league manager).</p>`:''}`}${tools}${gameLog(nt, editing)}</details>`;
   }).join('');
+}
+let excuseNight=null;
+function excuseSection(){
+  const list=nights.slice().sort((a,b)=>a.date<b.date?1:-1); if(!list.length) return '<p class="muted">No saved nights yet.</p>';
+  const nt=list.find(n=>n.date===excuseNight)||list[0], ex=new Set(nt.excused||[]);
+  const ppl=[...new Set((nt.games||[]).flatMap(g=>(g.pairs||[]).flat()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const all=list.filter(n=>(n.excused||[]).length);
+  return `<p class="muted">If someone played but it doesn’t reflect them (unwell, injured), tap their name. That night then gives them no points and doesn’t move their rating. Everyone else’s results stay the same.</p>
+    <label class="muted" for="excuse-night">Night</label>
+    <select id="excuse-night">${list.slice(0,20).map(n=>`<option value="${esc(n.date)}"${n===nt?' selected':''}>${esc(nightLabel(n))}</option>`).join('')}</select>
+    <div class="row excuse-chips">${ppl.map(p=>`<button class="btn sm${ex.has(p)?' primary':''}" data-excuse="${esc(p)}" aria-pressed="${ex.has(p)}">${ex.has(p)?'✕ ':''}${esc(p)}</button>`).join('')}</div>
+    ${all.length?`<p class="muted"><b>Not counted:</b> ${all.map(n=>`${esc(nightLabel(n))}: ${n.excused.map(esc).join(', ')}`).join(' · ')}</p>`:''}`;
+}
+async function toggleExcuse(name){
+  const list=nights.slice().sort((a,b)=>a.date<b.date?1:-1), nt=list.find(n=>n.date===excuseNight)||list[0]; if(!nt) return;
+  const ex=new Set(nt.excused||[]), on=!ex.has(name); on?ex.add(name):ex.delete(name);
+  const rec={...nt, excused:[...ex]}; delete rec._id;
+  if(db && nt._id){ try{ await db.doc('nights/'+nt._id).set(rec); }catch(e){ setStatus('Couldn’t save. Check your connection and try again', true); return; } }
+  nt.excused=[...ex]; if(!(db && nt._id)) lsSave();
+  logChange(`${on?'Excused':'Counted again'}: ${name} for ${nightLabel(nt)}`); setStatus(on?`${name}’s ${nightLabel(nt)} no longer counts`:`${name}’s ${nightLabel(nt)} counts again`); render();
 }
 function editTools(key, editing){
   const isNight = key!=='tonight';
@@ -1788,6 +1810,7 @@ $('#main').addEventListener('submit', async e=>{
     render(); }
 });
 $('#main').addEventListener('change', e=>{
+  if(e.target.id==='excuse-night'){ excuseNight=e.target.value; render(); return; }
   const T=e.target, D=T.dataset;
   if(T.id==='merge-a'||T.id==='merge-b'){ mergeSel[T.id==='merge-a'?0:1]=T.value; confirming=null; lmMsg.merge=null; return; }
   if(manual){
@@ -1836,6 +1859,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
+  else if(d.excuse){ toggleExcuse(d.excuse); }
   else if(d.sort){ seedSort = seedSort.key===d.sort ? {key:d.sort, dir:-seedSort.dir} : {key:d.sort, dir:d.sort==='name'?1:-1}; render(); }
   else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
   else if(t.id==='ann-cancel'){ annDraft=null; annEditId=null; lmMsg.ann=null; render(); }
