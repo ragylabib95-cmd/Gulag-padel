@@ -40,7 +40,16 @@
   --ball:#d6e22a; --ball-fg:#17212e;
   --win:#3cc277; --win-soft:#17392a; color-scheme:dark }
 *{box-sizing:border-box}
+html{background:var(--bg)}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;margin:0}
+ /* the smash video plays faintly behind the Announcement and Seeding tabs */
+#bgvid{position:fixed;inset:0;z-index:-1;display:none;pointer-events:none;background:var(--bg)}
+#bgvid video{width:100%;height:100%;object-fit:cover;object-position:center 60%;opacity:.24}
+@media (max-aspect-ratio: 1/1){#bgvid video{object-fit:contain;object-position:center bottom;opacity:.32}}
+body.bgvid{background:transparent}
+body.bgvid #bgvid{display:block}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) #bgvid video{opacity:.16}}
+:root[data-theme="dark"] #bgvid video{opacity:.16}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court)}
 .wrap{max-width:720px;margin:0 auto;padding-block:12px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .topband{background:var(--court);color:var(--court-fg);border-bottom:4px solid var(--ball)}
@@ -547,6 +556,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 </style>
 </head>
 <body>
+<div id="bgvid" aria-hidden="true"><video muted loop playsinline preload="metadata" poster="media/gulag-smash.jpg" disablepictureinpicture><source src="media/gulag-smash.mp4" type="video/mp4"></video></div>
 <div id="splash" aria-hidden="true"><div class="splash-in"><div class="splash-mark"><span class="s-gulag">GULAG</span><span class="s-padel"><svg viewBox="0 0 40 56" aria-hidden="true"><path class="head" d="M3 1h18c10 0 17 7 17 16.5S31 34 21 34h-5l-4 5H3z"/><g class="hole"><circle cx="13" cy="9" r="2.4"/><circle cx="21" cy="8" r="2.4"/><circle cx="29" cy="11" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="20" cy="17" r="2.4"/><circle cx="29" cy="20" r="2.4"/><circle cx="13" cy="27" r="2.4"/><circle cx="21" cy="26" r="2.4"/></g><rect class="grip" x="3" y="38" width="8" height="18" rx="2"/></svg>ADEL</span></div><div class="splash-bar"></div><div class="splash-quote" id="splash-quote">“Don’t get stuck in the gulag”</div></div></div>
 <script>
 /* Splash: shown once per visit. Hidden as soon as the seeding has loaded and the logo has had its moment. */
@@ -1244,6 +1254,13 @@ function acctView(){
 }
 const AUTH_ERR = {'auth/invalid-credential':'That email and password don’t match.','auth/wrong-password':'That email and password don’t match.','auth/user-not-found':'There’s no account with that email. Create one first.','auth/email-already-in-use':'That email already has an account. Sign in instead.','auth/weak-password':'Use at least 6 characters for the password.','auth/invalid-email':'That email address doesn’t look right.','auth/too-many-requests':'Too many tries. Wait a few minutes and try again.','auth/network-request-failed':'No connection. Check your signal and try again.'};
 function lockView(){ return `<h2>Tonight</h2><div class="banner">No night is running right now. A ref or the league manager sets up the night.</div>${refForm()}`; }
+function bgVideo(){
+  const show = tab==='seed' || tab==='ann', v=document.querySelector('#bgvid video');
+  document.body.classList.toggle('bgvid', show); if(!v) return;
+  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(show && !still){ if(v.paused){ const pr=v.play(); if(pr&&pr.catch) pr.catch(()=>{}); } } else if(!v.paused) v.pause();
+}
+document.addEventListener('visibilitychange', ()=>{ const v=document.querySelector('#bgvid video'); if(!v) return; if(document.hidden) v.pause(); else bgVideo(); });
 function render(){
   refreshSeeds(); refreshLive();
   { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann'; }
@@ -1252,6 +1269,7 @@ function render(){
   const shown = (tab==='night' && v) || (night.phase==='live' && night.venue);
   $('#venue-name').textContent = shown && VENUES[shown] ? VENUES[shown].name : '';
   document.querySelectorAll('nav button').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===tab));
+  bgVideo();
   $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? (ref ? `<div class="live-drag">${liveView(false)}</div>` : liveView(true)) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
 }
 const pts = n => `<span class="pts">${n}</span>`;
