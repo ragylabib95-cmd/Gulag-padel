@@ -990,7 +990,6 @@ function annView(){
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
     <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${nm(r||p)}</span>${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
-    ${unlocked?`<p class="muted">Shown until the game starts, then the site opens on Seeding again. Edit it in LM Tools → Announcements.</p>`:''}
   </article>`;
 }
 function annForm(){
