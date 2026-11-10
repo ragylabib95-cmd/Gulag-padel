@@ -956,10 +956,18 @@ function setScore(c, t, v){
   const [x,y]=c.score;
   c.winner = x!=null && y!=null && (x===3)!==(y===3) ? (x===3?0:1) : null;
 }
+// a night is saved under an id made from its start time, so a second tap, a second phone or a retry can't save another copy
+const nightId = date => 'n'+String(date).replace(/[^0-9A-Za-z]/g,'');
+let ending=false;
 async function endNight(){
+  if(ending) return;
   const rec = {venue:night.venue||null, date:night.startedAt||new Date().toISOString(), players:night.arrivals, left:night.left, games:tonightGames(), rounds:night.round};
   if(rec.games.length){
-    if(db){ try{ await db.collection('nights').add(rec); }catch(e){ setStatus('Couldn’t save the night. Try again', true); return; } }
+    if(db){ ending=true; setStatus('Saving the night…');
+      try{ await db.doc('nights/'+nightId(rec.date)).set(rec); }
+      catch(e){ const already = /permission/i.test(String(e&&(e.code||e.message))) && nights.some(n=>n.date===rec.date); // someone else already saved this night
+        if(!already){ ending=false; setStatus('Couldn’t save the night. Try again', true); return; } }
+      ending=false; }
     if(!nights.some(n=>n.date===rec.date)) nights.unshift(rec);
     justEnded=rec.date; if(!db) lsSave();
   }
@@ -1463,6 +1471,7 @@ function lmView(){
   ${LMSEC('ratings','Starting ratings',ratings, rated.length?`${rated.length} set`:'')}
   ${LMSEC('nights',`Nights (${hs.length})`,nightsBody,'Edit scores or delete')}
   ${LMSEC('manual','Add a past night',addNight)}
+  ${dupSection()}
   ${LMSEC('excuse','Don’t count a night for a player',excuseSection(),'Unwell or injured')}
   ${LMSEC('rules','Seeding settings',rules)}
   ${LMSEC('seasons','Seasons',seasons, esc(cs.name))}
@@ -1716,7 +1725,16 @@ function historyView(){
     ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}${(nt.excused||[]).length?`<p class="muted excused-note">Not counted for ${nt.excused.map(esc).join(', ')} (excused by the league manager).</p>`:''}`}${tools}${gameLog(nt, editing)}</details>`;
   }).join('');
 }
-let excuseNight=null;
+let excuseNight=null, dupNights=[];
+function dupSection(){
+  if(!dupNights.length) return '';
+  const by={}; dupNights.forEach(n=>{ const l=nightLabel(n); by[l]=(by[l]||0)+1; });
+  return `<div class="confirm"><p><b>${dupNights.length} extra cop${dupNights.length===1?'y':'ies'} of saved nights found</b> (${Object.entries(by).map(([l,c])=>`${esc(l)} ×${c}`).join(', ')}). Only the fullest copy of each night counts in History and the seeding.</p><div class="row"><button class="btn sm primary" id="dup-clean">Delete the extra copies</button></div></div>`;
+}
+async function cleanDups(){
+  let ok=0; for(const n of dupNights.slice()){ if(db && n._id){ try{ await db.doc('nights/'+n._id).delete(); ok++; }catch(e){} } }
+  logChange(`Deleted ${ok} duplicate saved night${ok===1?'':'s'}`); setStatus(`Deleted ${ok} extra cop${ok===1?'y':'ies'}`); render();
+}
 function excuseSection(){
   const list=nights.slice().sort((a,b)=>a.date<b.date?1:-1); if(!list.length) return '<p class="muted">No saved nights yet.</p>';
   const nt=list.find(n=>n.date===excuseNight)||list[0], ex=new Set(nt.excused||[]);
@@ -1979,6 +1997,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='end'){ confirming='end'; render(); }
   else if(t.id==='end-no'){ confirming=null; render(); }
   else if(t.id==='end-yes') endNight();
+  else if(t.id==='dup-clean') cleanDups();
   else if(d.rm!=null){ confirming='rm:'+d.rm; render(); }
   else if(d.ren!=null){ renaming=d.ren; renameErr=''; confirming=null; render(); const i=$('#rename-in'); if(i){ i.focus(); i.select(); } }
   else if(t.id==='rename-no'){ renaming=null; renameErr=''; confirming=null; render(); }
@@ -2083,7 +2102,9 @@ lsLoad(); render();
   db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
   db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
   db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
-  db.collection('nights').onSnapshot(q=>{ if(window.__splashReady) window.__splashReady(); nights = q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */ if(!typing()) render(); }, ()=>{});
+  db.collection('nights').onSnapshot(q=>{ if(window.__splashReady) window.__splashReady(); { const all=q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */
+    // copies of the same night (same start time) only count once; the LM can delete the spares in LM Tools
+    const seen=new Map(); dupNights=[]; all.forEach(n=>{ const o=seen.get(n.date); if(!o) seen.set(n.date,n); else if((n.games||[]).length>(o.games||[]).length){ dupNights.push(o); seen.set(n.date,n); } else dupNights.push(n); }); nights=[...seen.values()]; } if(!typing()) render(); }, ()=>{});
 })();
 </script>
 
