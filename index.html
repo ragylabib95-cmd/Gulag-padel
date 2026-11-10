@@ -721,16 +721,16 @@ function seeding(season, before){
   // before: an ISO date; gives the seeding as it stood just before that moment (used for week-on-week movement)
   const h=history(), now=before?new Date(before).getTime():season.end?new Date(season.end).getTime():Date.now(), s={};
   const inSeason = nt => (!season.start || nt.date>=season.start) && (!season.end || nt.date<season.end) && (!before || nt.date<before);
-  if(!season.end) roster.forEach(p=> s[p]={name:p, seed:0, n:0, w:0, g:0});
+  if(!season.end) roster.forEach(p=> s[p]={name:p, seed:0, n:0, w:0, g:0, gw:0, gl:0});
   h.nights.forEach(({nt,st})=>{
     if(!inSeason(nt)) return;
     const age=(now-new Date(nt.date))/DAY, wt = age<=S('fullWeeks')*7?1:age<=S('halfWeeks')*7?.5:0;
-    Object.values(st).forEach(r=>{ const x=s[r.name]=s[r.name]||{name:r.name,seed:0,n:0,w:0,g:0};
-      x.w+=r.w; x.g+=r.g; if(wt){ x.seed+=r.pts*wt; x.n++; } });
+    Object.values(st).forEach(r=>{ const x=s[r.name]=s[r.name]||{name:r.name,seed:0,n:0,w:0,g:0,gw:0,gl:0};
+      x.w+=r.w; x.g+=r.g; x.gw+=r.gw||0; x.gl+=r.gl||0; if(wt){ x.seed+=r.pts*wt; x.n++; } });
   });
   // manual point adjustments from LM Tools count in full in the season they were made
   (settings.adjust||[]).forEach(a=>{ if((season.start && a.at<season.start) || (season.end && a.at>=season.end) || (before && a.at>=before)) return;
-    const x=s[a.name]=s[a.name]||{name:a.name,seed:0,n:0,w:0,g:0}; x.seed+=a.pts; x.adj=(x.adj||0)+a.pts; });
+    const x=s[a.name]=s[a.name]||{name:a.name,seed:0,n:0,w:0,g:0,gw:0,gl:0}; x.seed+=a.pts; x.adj=(x.adj||0)+a.pts; });
   return Object.values(s).map(x=>({...x, seed:Math.round(x.seed), rating:Math.round(rate(h.elo,x.name))}))
     .sort((a,b)=> b.seed-a.seed || b.rating-a.rating || a.name.localeCompare(b.name));
 }
@@ -1660,7 +1660,7 @@ function seedView(){
     return rows; };
   enrich(t,null);
   const K=seedSort.key, perGame=['ppg','best','rating','winp'].includes(K); // fair-play views need a few nights before a player is ranked
-  const valOf=(r,k)=>k==='name'?r.name:k==='wl'?r.w-(r.g-r.w):k==='n'?r.n:r[k], val=r=>valOf(r,K);
+  const valOf=(r,k)=>k==='name'?r.name:k==='wl'?r.w-(r.g-r.w):k==='gwl'?(r.gw||0)-(r.gl||0):k==='n'?r.n:r[k], val=r=>valOf(r,K);
   const MIN_NIGHTS=1, okFor=(r,k)=>k==='seed'?r.seed>0:['ppg','best','rating','winp'].includes(k)?r.counted>=MIN_NIGHTS:r.g>0, ok=r=>okFor(r,K);
   const order=(rows,k,dir)=>rows.slice().sort((a,b)=> (okFor(b,k)-okFor(a,k)) || (k==='name'?a.name.localeCompare(b.name)*dir:(valOf(a,k)-valOf(b,k))*dir) || (a.seedPos-b.seedPos));
   const rows=order(t,K,seedSort.dir);
@@ -1671,10 +1671,10 @@ function seedView(){
       order(prev,K,-1).filter(r=>okFor(r,K)).forEach((r,i)=>prevRank[r.name]=i+1); } }
   const COLS=[['seed','Seed pts','Points from the last '+S('fullWeeks')+' weeks (older weeks half). The official ladder.'],['ppg','Pts/game','Seed points per game played. Playing more doesn’t add up; playing better does.'],
     ['best','Best 5','Best 5 nights, each scored per game (scaled to an average night of '+avgG.toFixed(1)+' games).'],['rating','Rating','Skill rating: up for beating stronger pairs, down for losing.'],
-    ['winp','Win %','Share of games won this season.'],['wl','W–L','Wins and losses this season.'],['n','Nights','Nights in the last '+S('halfWeeks')+' weeks.']];
+    ['winp','Win %','Share of games won this season.'],['wl','W–L','Matches won and lost this season.'],['gwl','Games W–L','Mini games won and lost this season (a 3–1 win is 3 won, 1 lost), sorted by the difference.'],['n','Nights','Nights in the last '+S('halfWeeks')+' weeks.']];
   const th=([k,l,tip])=>`<th class="n"><button class="sorth${K===k?' on':''}" data-sort="${k}" title="${esc(tip)}">${l}${K===k?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>`;
   const cell=(k,r)=>{ const dim=!ok(r)&&K===k?' dim':'', on=K===k?' on':'';
-    const v= k==='seed'?pts(r.seed) : k==='ppg'?(r.counted?r.ppg.toFixed(1):'–') : k==='best'?(r.counted?Math.round(r.best):'–') : k==='rating'?r.rating : k==='winp'?(r.g?Math.round(r.winp*100)+'%':'–') : k==='wl'?`${r.w}–${r.g-r.w}` : r.n;
+    const v= k==='seed'?pts(r.seed) : k==='ppg'?(r.counted?r.ppg.toFixed(1):'–') : k==='best'?(r.counted?Math.round(r.best):'–') : k==='rating'?r.rating : k==='winp'?(r.g?Math.round(r.winp*100)+'%':'–') : k==='wl'?`${r.w}–${r.g-r.w}` : k==='gwl'?(r.g?`${r.gw||0}–${r.gl||0}`:'–') : r.n;
     return `<td class="n${on}${dim}">${v}</td>`; };
   const expl=Object.fromEntries(COLS.map(c=>[c[0],c[2]]));
   let pos=0;
