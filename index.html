@@ -1722,7 +1722,7 @@ function historyView(){
   return `<h2>History</h2>` + h.map(({nt,st})=>{
     const r=rank(st), editing=false, open=false, tools='';
     return `<details class="night"${open||sumOpen===nt.date?' open':''}><summary><b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b><span class="muted">${nt.venue&&VENUES[nt.venue]?esc(VENUES[nt.venue].name)+' · ':''}${nt.players.length} players · ${nt.rounds} rounds${r[0]?` · Top: ${esc(r[0].name)}`:''}</span></summary>
-    ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}${(nt.excused||[]).length?`<p class="muted excused-note">Not counted for ${nt.excused.map(esc).join(', ')} (excused by the league manager).</p>`:''}`}${tools}${gameLog(nt, editing)}</details>`;
+    ${editing?'':`<div class="row sum-toggle"><button class="btn sm" data-sum="${esc(nt.date)}">${sumOpen===nt.date?'Hide summary':'Night summary'}</button></div>${sumOpen===nt.date?summaryCard(nt.date):''}<div class="round-lab">Ranking</div>${rankTable(r,{left:nt.left||[]})}`}${tools}${gameLog(nt, editing)}</details>`;
   }).join('');
 }
 let excuseNight=null, dupNights=[];
