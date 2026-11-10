@@ -1656,12 +1656,12 @@ function seedView(){
   const H=history(), {avgG}=ladderStats(null,null,H);
   const enrich=(rows,before)=>{ const LS=ladderStats(null,before,H).stats, pos={}; rows.forEach((r,i)=>pos[r.name]=i+1);
     let elo=null; if(before){ const x=H.nights.find(y=>y.nt.date>=before); elo=x?x.before:H.elo; }
-    rows.forEach(r=>{ const x=LS[r.name]||{ppg:0,best:0,counted:0}; Object.assign(r,{ppg:x.ppg, best:x.best, counted:x.counted, winp:r.g?r.w/r.g:0, seedPos:pos[r.name]}); if(elo) r.rating=Math.round(rate(elo,r.name)); });
+    rows.forEach(r=>{ const x=LS[r.name]||{ppg:0,best:0,counted:0}; Object.assign(r,{ppg:x.ppg, best:x.best, counted:x.counted, winp:r.g?r.w/r.g:0, gwp:(r.gw+r.gl)?r.gw/(r.gw+r.gl):0, seedPos:pos[r.name]}); if(elo) r.rating=Math.round(rate(elo,r.name)); });
     return rows; };
   enrich(t,null);
-  const K=seedSort.key, perGame=['ppg','best','rating','winp'].includes(K); // fair-play views need a few nights before a player is ranked
+  const K=seedSort.key, perGame=['ppg','best','rating','winp','gwp'].includes(K); // fair-play views need a few nights before a player is ranked
   const valOf=(r,k)=>k==='name'?r.name:k==='wl'?r.w-(r.g-r.w):k==='gwl'?(r.gw||0)-(r.gl||0):k==='n'?r.n:r[k], val=r=>valOf(r,K);
-  const MIN_NIGHTS=1, okFor=(r,k)=>k==='seed'?r.seed>0:['ppg','best','rating','winp'].includes(k)?r.counted>=MIN_NIGHTS:r.g>0, ok=r=>okFor(r,K);
+  const MIN_NIGHTS=1, okFor=(r,k)=>k==='seed'?r.seed>0:['ppg','best','rating','winp','gwp'].includes(k)?r.counted>=MIN_NIGHTS:r.g>0, ok=r=>okFor(r,K);
   const order=(rows,k,dir)=>rows.slice().sort((a,b)=> (okFor(b,k)-okFor(a,k)) || (k==='name'?a.name.localeCompare(b.name)*dir:(valOf(a,k)-valOf(b,k))*dir) || (a.seedPos-b.seedPos));
   const rows=order(t,K,seedSort.dir);
   // movement since last week in this column: best-first position now vs just before the latest night
@@ -1671,10 +1671,10 @@ function seedView(){
       order(prev,K,-1).filter(r=>okFor(r,K)).forEach((r,i)=>prevRank[r.name]=i+1); } }
   const COLS=[['seed','Seed pts','Points from the last '+S('fullWeeks')+' weeks (older weeks half). The official ladder.'],['ppg','Pts/game','Seed points per game played. Playing more doesn’t add up; playing better does.'],
     ['best','Best 5','Best 5 nights, each scored per game (scaled to an average night of '+avgG.toFixed(1)+' games).'],['rating','Rating','Skill rating: up for beating stronger pairs, down for losing.'],
-    ['winp','Win %','Share of games won this season.'],['wl','W–L','Matches won and lost this season.'],['gwl','Games W–L','Mini games won and lost this season (a 3–1 win is 3 won, 1 lost), sorted by the difference.'],['n','Nights','Nights in the last '+S('halfWeeks')+' weeks.']];
+    ['winp','Win %','Share of matches won this season.'],['wl','W–L','Matches won and lost this season.'],['gwl','Games W–L','Mini games won and lost this season (a 3–1 win is 3 won, 1 lost), sorted by the difference.'],['gwp','Games %','Share of mini games won this season.'],['n','Nights','Nights in the last '+S('halfWeeks')+' weeks.']];
   const th=([k,l,tip])=>`<th class="n"><button class="sorth${K===k?' on':''}" data-sort="${k}" title="${esc(tip)}">${l}${K===k?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>`;
   const cell=(k,r)=>{ const dim=!ok(r)&&K===k?' dim':'', on=K===k?' on':'';
-    const v= k==='seed'?pts(r.seed) : k==='ppg'?(r.counted?r.ppg.toFixed(1):'–') : k==='best'?(r.counted?Math.round(r.best):'–') : k==='rating'?r.rating : k==='winp'?(r.g?Math.round(r.winp*100)+'%':'–') : k==='wl'?`${r.w}–${r.g-r.w}` : k==='gwl'?(r.g?`${r.gw||0}–${r.gl||0}`:'–') : r.n;
+    const v= k==='seed'?pts(r.seed) : k==='ppg'?(r.counted?r.ppg.toFixed(1):'–') : k==='best'?(r.counted?Math.round(r.best):'–') : k==='rating'?r.rating : k==='winp'?(r.g?Math.round(r.winp*100)+'%':'–') : k==='wl'?`${r.w}–${r.g-r.w}` : k==='gwp'?(r.g?Math.round(r.gwp*100)+'%':'–') : k==='gwl'?(r.g?`${r.gw||0}–${r.gl||0}`:'–') : r.n;
     return `<td class="n${on}${dim}">${v}</td>`; };
   const expl=Object.fromEntries(COLS.map(c=>[c[0],c[2]]));
   let pos=0;
