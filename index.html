@@ -792,7 +792,7 @@ function undoRound(){
 }
 /* King of the court (trial): from round 3 by default, or whenever a ref switches it on, the pair that wins Tier 1
    stays together as the kings until they lose. Challengers are the Tier 2 winners, as the pair that won. */
-const kotcOn = (N, round) => N.kotc===true ? true : N.kotc===false ? false : round>=3;
+const kotcOn = (N, round) => N.kotc===true && round>=2; // off unless switched on (from round 2)
 const pairKey = pr => [...pr].sort().join('|');
 function reignOf(log, pair){ // consecutive Tier 1 wins by this exact pair, most recent first
   const k=pairKey(pair); let r=0;
@@ -1587,9 +1587,9 @@ function liveView(ro){
   ${!ro&&(night.leaveUndo||[]).length?(()=>{ const u=night.leaveUndo[night.leaveUndo.length-1];
     return confirming==='leaveundo' ? `<div class="confirm"><p>Give ${esc(u.p)} their spot back? Scores or changes made since they left will be cleared.</p><div class="row"><button class="btn danger" id="leave-undo-yes">Undo ${esc(u.p)} leaving</button><button class="btn" id="end-no">Cancel</button></div></div>`
       : `<div class="leave-undo"><span><b>${esc(u.p)}</b> marked as left early.</span><button class="btn sm primary" id="leave-undo">Undo</button></div>`; })():''}
-  ${n>1?(()=>{ const nowOn = night.kotc===true || (night.kotc!==false && night.round>=3), willOn = kotcOn(night, night.round+1), auto = night.kotc!==true && night.kotc!==false;
-    const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn ? (night.round===1?'On from round 2':'On from next round') : auto&&night.round<3 ? 'Starts round 3' : 'Off';
-    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${auto?' (auto)':''}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
+  ${n>1&&night.round>=2?(()=>{ const nowOn = night.kotc===true;
+    const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn ? 'On from next round' : 'Off';
+    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. Press and hold a name, then drag it onto another player or a sub to swap them. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${carryView(ro)}
@@ -1899,7 +1899,7 @@ $('#main').addEventListener('click', async e=>{
   else if(d.anndel!=null){ confirming='annrm:'+d.anndel; render(); }
   else if(d.annrmyes!=null){ const id=d.annrmyes, a=allAnns().find(x=>x.id===id); settings.announcements=(settings.announcements||[]).filter(x=>x.id!==id); if(id===BUILTIN_ANN.id) settings.annRemoved=[...(settings.annRemoved||[]), id]; saveSettings(); logChange(`Deleted the roster for ${a?annWhen(a):id}`); confirming=null; render(); }
   else if(t.id==='ann-fill'){ const a=lastAnn(); if(a){ const names=(a.players||[]).map(p=>resolveName(p)||p); night.setup.names=names.slice(); night.setup.courts=Math.max(1,Math.min(MAXC,a.courts||night.setup.courts)); night.setup.subs=Math.max(0,Math.min(MAXS,names.length-night.setup.courts*4)); if(a.venue) night.setup.venue=a.venue; names.forEach(n=>{ if(!roster.includes(n)){ roster.push(n); } }); saveRoster(); saveNight(); render(); } }
-  else if(t.id==='kotc-toggle'){ const on = !(night.kotc===true || (night.kotc!==false && night.round>=3));
+  else if(t.id==='kotc-toggle'){ const on = night.kotc!==true;
     night.kotc = on; const c=night.courts[0];
     if(c && c.wait && night.carry){ night.carry.crown = on && night.round>=2; }
     else if(c && night.courts.length>1 && night.round>=2 && !(c.score&&(c.score[0]!=null||c.score[1]!=null))){ if(on && !c.kotc) crownCourt(c, night.log); else if(!on && c.kotc){ c.kotc=false; c.kings=null; c.reign=0; c.pairs=null; c.face=null; c.aLab='Won Tier 1, stayed'; c.bLab='Won, came up'; } }
