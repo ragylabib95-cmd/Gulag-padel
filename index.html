@@ -43,7 +43,9 @@
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;margin:0}
  /* the smash video plays under the title on the Announcement and Seeding tabs */
 #bgvid{display:none;margin:4px 0 0;border-radius:12px;overflow:hidden;background:#e9e0d6;aspect-ratio:16/9}
-#bgvid video{display:block;width:100%;height:100%;object-fit:cover}
+#bgvid video{display:none;width:100%;height:100%;object-fit:cover}
+#bgvid video.on{display:block}
+#bgvid.tall{aspect-ratio:4/5;max-width:480px;margin-left:auto;margin-right:auto}
 body.bgvid #bgvid{display:block}
 @media (max-width:520px){#bgvid{margin-left:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1*max(16px,env(safe-area-inset-right,0px)));border-radius:0;margin-top:-12px}}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court)}
@@ -575,7 +577,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
   </header>
 </div></div>
 <div class="wrap">
-  <div id="bgvid" aria-hidden="true"><video muted loop playsinline preload="metadata" poster="media/gulag-smash.jpg" disablepictureinpicture><source src="media/gulag-smash.mp4" type="video/mp4"></video></div>
+  <div id="bgvid" aria-hidden="true"><video data-for="seed" muted loop playsinline preload="metadata" poster="media/gulag-smash.jpg" disablepictureinpicture><source src="media/gulag-smash.mp4" type="video/mp4"></video><video data-for="ann" muted loop playsinline preload="metadata" poster="media/debt-collector.jpg" disablepictureinpicture><source src="media/debt-collector.mp4" type="video/mp4"></video></div>
   <nav role="tablist">
     <button role="tab" data-tab="ann" aria-selected="false" hidden>Announcement</button>
     <button role="tab" data-tab="seed" aria-selected="true">Seeding</button>
@@ -1260,12 +1262,15 @@ function acctView(){
 const AUTH_ERR = {'auth/invalid-credential':'That email and password don’t match.','auth/wrong-password':'That email and password don’t match.','auth/user-not-found':'There’s no account with that email. Create one first.','auth/email-already-in-use':'That email already has an account. Sign in instead.','auth/weak-password':'Use at least 6 characters for the password.','auth/invalid-email':'That email address doesn’t look right.','auth/too-many-requests':'Too many tries. Wait a few minutes and try again.','auth/network-request-failed':'No connection. Check your signal and try again.'};
 function lockView(){ return `<h2>Tonight</h2><div class="banner">No night is running right now. A ref or the league manager sets up the night.</div>${refForm()}`; }
 function bgVideo(){
-  const show = tab==='seed' || tab==='ann', v=document.querySelector('#bgvid video');
-  document.body.classList.toggle('bgvid', show); if(!v) return;
+  // Seeding shows the smash cartoon; Announcement shows the debt collector
+  const show = tab==='seed' || tab==='ann', box=document.querySelector('#bgvid');
+  document.body.classList.toggle('bgvid', show); if(!box) return;
+  box.classList.toggle('tall', tab==='ann');
   const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(show && !still){ if(v.paused){ const pr=v.play(); if(pr&&pr.catch) pr.catch(()=>{}); } } else if(!v.paused) v.pause();
+  box.querySelectorAll('video').forEach(v=>{ const mine = show && v.dataset.for===tab; v.classList.toggle('on', mine);
+    if(mine && !still){ if(v.paused){ const pr=v.play(); if(pr&&pr.catch) pr.catch(()=>{}); } } else if(!v.paused) v.pause(); });
 }
-document.addEventListener('visibilitychange', ()=>{ const v=document.querySelector('#bgvid video'); if(!v) return; if(document.hidden) v.pause(); else bgVideo(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) document.querySelectorAll('#bgvid video').forEach(v=>v.pause()); else bgVideo(); });
 function render(){
   refreshSeeds(); refreshLive();
   { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann'; }
