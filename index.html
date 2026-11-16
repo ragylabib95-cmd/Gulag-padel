@@ -799,7 +799,9 @@ function reignOf(log, pair){ // consecutive Tier 1 wins by this exact pair, most
   log.filter(g=>g.court===0 && g.pairs && g.winner!=null).sort((a,b)=>b.round-a.round).some(g=>{ if(pairKey(g.pairs[g.winner])===k){ r++; return false; } return true; });
   return r;
 }
-function crownCourt(c, log){ c.kotc=true; c.kings=[...c.a]; c.pairs=[[...c.a],[...c.b]]; c.face='kotc'; c.reign=Math.max(1,reignOf(log,c.a)); c.aLab='Kings'; c.bLab='Challengers'; }
+const KOTC_MAX=2; // the kings can stay together for at most 2 games in a row, then Tier 1 splits as normal
+const kingsDone = (c, log) => reignOf(log, c.a) >= KOTC_MAX;
+function crownCourt(c, log){ if(kingsDone(c, log)) return false; c.kotc=true; c.kings=[...c.a]; c.pairs=[[...c.a],[...c.b]]; c.face='kotc'; c.reign=Math.max(1,reignOf(log,c.a)); c.aLab='Kings'; c.bLab='Challengers'; return true; }
 /* One-court nights: no winners up / losers off. Teams are reshuffled every game and the sit-outs rotate fairly:
    whoever has sat out the fewest times sits next (ties: the one who sat out longest ago), so with 5 players everyone
    sits out once every 5 games. The draw is seeded from the night and round, so the lineup check matches what you get. */
@@ -1588,7 +1590,7 @@ function liveView(ro){
     return confirming==='leaveundo' ? `<div class="confirm"><p>Give ${esc(u.p)} their spot back? Scores or changes made since they left will be cleared.</p><div class="row"><button class="btn danger" id="leave-undo-yes">Undo ${esc(u.p)} leaving</button><button class="btn" id="end-no">Cancel</button></div></div>`
       : `<div class="leave-undo"><span><b>${esc(u.p)}</b> marked as left early.</span><button class="btn sm primary" id="leave-undo">Undo</button></div>`; })():''}
   ${n>1&&night.round>=2?(()=>{ const nowOn = night.kotc===true;
-    const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn ? 'On from next round' : 'Off';
+    const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn&&C[0]&&!C[0].wait&&night.log.length&&kingsDone(C[0],night.log) ? 'On · kings split after 2 together' : nowOn ? 'On from next round' : 'Off';
     return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. Press and hold a name, then drag it onto another player or a sub to swap them. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
