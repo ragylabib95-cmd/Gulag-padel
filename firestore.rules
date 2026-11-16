@@ -69,6 +69,17 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // announcement poll votes: anyone can read; anyone can cast or change a vote, but only yes/no with a short name
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['poll','name','vote','at'])
+        && request.resource.data.vote in ['yes','no']
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.poll is string && request.resource.data.poll.size() <= 80
+        && request.resource.data.at is string && request.resource.data.at.size() <= 40;
+      allow delete: if isLM();
+    }
+
     // saved nights: refs can save a finished night, only the LM can edit or delete one
     match /nights/{nightId} {
       allow read: if true;

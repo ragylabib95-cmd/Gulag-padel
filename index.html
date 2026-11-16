@@ -491,6 +491,19 @@ summary{cursor:pointer;font-weight:600}
 .ann-facts b{font-size:16px}
 .ann-spots{margin:12px 16px 0;font-weight:700;color:var(--win)}
 .ann-spots.full{color:var(--gulag)}
+.poll{margin:0;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.poll-q{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.02em}
+.poll-q svg{width:22px;height:22px;flex:none}
+.poll-vote select{width:100%;margin-bottom:8px}
+.poll-btns{display:flex;gap:8px}.poll-btns .btn{flex:1}
+.poll-btns .btn[disabled]{opacity:.5}
+.poll-res{margin-top:10px}
+.poll-bar{position:relative;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:var(--bg);overflow:hidden;font-weight:700}
+.poll-bar i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--court) 28%,transparent)}
+.poll-res.n .poll-bar i{background:color-mix(in srgb,var(--muted) 25%,transparent)}
+.poll-bar span,.poll-bar b{position:relative}
+.poll-who{margin:4px 2px 0;font-size:13px;color:var(--muted)}
+.poll-note{font-size:13px;margin:8px 0 0}
 .ann-list{margin:8px 0 0;padding:4px 16px 14px 44px;columns:2;column-gap:24px}
 .ann-list li{padding:5px 0;font-family:var(--display);font-weight:700;font-size:18px;break-inside:avoid}
 .ann-list li::marker{color:var(--muted);font-size:14px}
@@ -1005,11 +1018,39 @@ function activeAnn(){ const now=Date.now(); return allAnns().find(a=>T(annFrom(a
 const normName = n => String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function resolveName(n){ const K=knownNames(); if(K.includes(n)) return n; const k=normName(n); return K.find(x=>normName(x)===k) || null; }
 const annWhen = a => { const d=new Date(a.start); return d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); };
+/* ---------- announcement poll: rostered players vote on king of the court for Tier 1 ---------- */
+let votes=[], pollName=null, pollMsg='';
+try{ pollName=localStorage.getItem('gp-poll-name'); }catch(_){}
+const pollId = a => 'kotc-'+String(a.id||a.start).replace(/[^0-9A-Za-z-]/g,'');
+const voteKey = (pid,name) => pid+'__'+String(name).toLowerCase().replace(/[^0-9a-z]+/g,'-');
+function pollVotes(a){ const pid=pollId(a), on=new Set((a.players||[]).map(p=>resolveName(p)||p)); const by={};
+  votes.filter(v=>v.poll===pid && on.has(v.name)).forEach(v=>{ by[v.name]=v; }); return Object.values(by); }
+async function castVote(a, name, vote){
+  if(!db || !db.raw){ pollMsg='Voting needs a connection'; render(); return; }
+  const pid=pollId(a); pollName=name; try{ localStorage.setItem('gp-poll-name',name); }catch(_){}
+  const rec={poll:pid, name, vote, at:new Date().toISOString()};
+  votes=[...votes.filter(v=>!(v.poll===pid&&v.name===name)), rec]; pollMsg=''; render();
+  try{ await db.raw('votes/'+voteKey(pid,name)).set(rec); }
+  catch(e){ votes=votes.filter(v=>v!==rec); pollMsg='Couldn’t save your vote. Try again'; render(); }
+}
+function pollView(a){
+  const ps=(a.players||[]).map(p=>resolveName(p)||p); if(!ps.length) return '';
+  const V=pollVotes(a), yes=V.filter(v=>v.vote==='yes').map(v=>v.name), no=V.filter(v=>v.vote==='no').map(v=>v.name);
+  const me=pollName&&ps.includes(pollName)?pollName:'', mine=V.find(v=>v.name===me), tot=yes.length+no.length, pct=n=>tot?Math.round(n/tot*100):0;
+  const bar=(lab,list,cls)=>`<div class="poll-res ${cls}"><div class="poll-bar"><i style="width:${pct(list.length)}%"></i><span>${lab}</span><b>${list.length}</b></div>${list.length?`<p class="poll-who">${list.map(esc).join(', ')}</p>`:''}</div>`;
+  return `<section class="poll"><h3 class="poll-q">${crownSvg()}King of the court on Tier 1 tonight?</h3>
+    <div class="poll-vote"><select id="poll-name" aria-label="Your name"><option value="">Pick your name…</option>${ps.slice().sort((x,y)=>x.localeCompare(y)).map(p=>`<option${p===me?' selected':''}>${esc(p)}</option>`).join('')}</select>
+      <div class="poll-btns"><button class="btn sm${mine&&mine.vote==='yes'?' primary':''}" data-vote="yes"${me?'':' disabled'}>Yes, crown the kings</button><button class="btn sm${mine&&mine.vote==='no'?' primary':''}" data-vote="no"${me?'':' disabled'}>No, normal rotation</button></div>
+      ${pollMsg?`<p class="err-text">${esc(pollMsg)}</p>`:mine?`<p class="muted poll-note">You voted ${mine.vote==='yes'?'yes':'no'}. Tap the other option to change it.</p>`:''}</div>
+    ${bar('Yes',yes,'y')}${bar('No',no,'n')}
+    <p class="muted poll-note">${tot} of ${ps.length} rostered players voted</p></section>`;
+}
 function annView(){
   const a=activeAnn(); if(!a) return seedView();
   const ps=a.players||[], left=Math.max(0,(a.max||0)-ps.length);
   return `<article class="ann">
     <div class="ann-top"><span class="ann-eyebrow">Next game · ${esc(annWhen(a))}</span><h2 class="ann-title">${esc(a.title||'Padel')}</h2>${a.headline?`<p class="ann-head">${esc(a.headline)}</p>`:''}</div>
+    ${pollView(a)}
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
     <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
@@ -1607,7 +1648,8 @@ function liveView(ro){
       : `<div class="leave-undo"><span><b>${esc(u.p)}</b> marked as left early.</span><button class="btn sm primary" id="leave-undo">Undo</button></div>`; })():''}
   ${n>1&&night.round>=2?(()=>{ const nowOn = night.kotc===true;
     const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn&&C[0]&&!C[0].wait&&night.log.length&&kingsDone(C[0],night.log) ? 'On · kings split after 2 together' : nowOn ? 'On from next round' : 'Off';
-    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
+    const la=lastAnn(), PV=la?pollVotes(la):[], pollTxt=PV.length?` · Poll: ${PV.filter(v=>v.vote==='yes').length} yes, ${PV.filter(v=>v.vote==='no').length} no`:'';
+    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${pollTxt}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. Press and hold a name, then drag it onto another player or a sub to swap them. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${carryView(ro)}
@@ -1859,6 +1901,7 @@ $('#main').addEventListener('submit', async e=>{
     render(); }
 });
 $('#main').addEventListener('change', e=>{
+  if(e.target.id==='poll-name'){ pollName=e.target.value||null; try{ if(pollName) localStorage.setItem('gp-poll-name',pollName); }catch(_){} pollMsg=''; render(); return; }
   if(e.target.id==='excuse-night'){ excuseNight=e.target.value; render(); return; }
   const T=e.target, D=T.dataset;
   if(T.id==='merge-a'||T.id==='merge-b'){ mergeSel[T.id==='merge-a'?0:1]=T.value; confirming=null; lmMsg.merge=null; return; }
@@ -1908,6 +1951,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
+  else if(d.vote){ const a=activeAnn(), nm0=($('#poll-name')||{}).value||pollName; if(a && nm0) castVote(a, nm0, d.vote); }
   else if(d.excuse){ toggleExcuse(d.excuse); }
   else if(d.sort){ seedSort = seedSort.key===d.sort ? {key:d.sort, dir:-seedSort.dir} : {key:d.sort, dir:d.sort==='name'?1:-1}; render(); }
   else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
@@ -2118,6 +2162,7 @@ lsLoad(); render();
   const lost = ()=>setStatus('Lost connection. Reload the page', true);
   db.doc('club/settings').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/settings')) return; settings = s.exists ? JSON.parse(JSON.stringify(s.data())) : {}; if(!userPickedTab && tab==='seed' && activeAnn()) tab='ann'; if(!typing()) render(); }, ()=>{});
   db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
+  if(db.rawCol) db.rawCol('votes').onSnapshot(q=>{ votes=q.docs.map(d=>d.data()); if(!typing()) render(); }, ()=>{});
   db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
   db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
   db.collection('nights').onSnapshot(q=>{ if(window.__splashReady) window.__splashReady(); { const all=q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */
@@ -2155,6 +2200,9 @@ if (window.gpBackend === undefined) {
       collection: path => { const c = F.collection(fs, path); return {
         add: b => F.addDoc(c, body(b)),
         onSnapshot: (next, err, opt) => F.onSnapshot(opt && opt.limit ? F.query(c, F.orderBy('at', 'desc'), F.limit(opt.limit)) : c, q => next({ docs: q.docs.map(d => ({ id: d.id, data: () => JSON.parse(d.data().json || '{}') })) }), err) }; },
+      // plain documents in a collection (poll votes), so the security rules can check each field
+      rawCol: path => { const c = F.collection(fs, path); return {
+        onSnapshot: (next, err) => F.onSnapshot(c, q => next({ docs: q.docs.map(d => ({ id: d.id, data: () => d.data() })) }), err) }; },
       // plain document (the ref list), readable by the security rules
       raw: path => { const r = F.doc(fs, path); return {
         set: b => F.setDoc(r, b),
