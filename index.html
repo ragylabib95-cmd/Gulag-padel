@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="gp-build" content="20261116225955">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -504,6 +505,7 @@ summary{cursor:pointer;font-weight:600}
 .poll-bar span,.poll-bar b{position:relative}
 .poll-who{margin:4px 2px 0;font-size:13px;color:var(--muted)}
 .poll-note{font-size:13px;margin:8px 0 0}
+.update-bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 16px;border:0;border-radius:12px;background:var(--fg);color:var(--bg);font:inherit;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .owing{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#c0392b;color:#fff;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
 .btn.owe-on{background:#c0392b;border-color:#c0392b;color:#fff}
 .ann-list{margin:8px 0 0;padding:4px 16px 14px 44px;columns:2;column-gap:24px}
@@ -2159,6 +2161,23 @@ $('#flip-skip').addEventListener('click', ()=>{
 });
 
 /* ---------- boot ---------- */
+/* Phones keep an old copy of the page open for days. Check for a newer version when the page comes back into view
+   (and every 10 minutes); reload straight away unless someone is typing, otherwise offer a refresh bar. */
+(function(){
+  const mine=(document.querySelector('meta[name="gp-build"]')||{}).content; if(!mine || location.protocol==='file:') return;
+  let busyCheck=false, offered=false;
+  async function check(){
+    if(busyCheck || document.hidden) return; busyCheck=true;
+    try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text(); const m=t.match(/name="gp-build" content="([^"]+)"/);
+      if(m && m[1]!==mine){ const a=document.activeElement; const editing=a && /INPUT|TEXTAREA|SELECT/.test(a.tagName);
+        if(!editing && !document.querySelector('.sheet, .confirm')) location.reload();
+        else if(!offered){ offered=true; const b=document.createElement('button'); b.className='update-bar'; b.textContent='New version of the site. Tap to refresh'; b.onclick=()=>location.reload(); document.body.appendChild(b); } } }
+    catch(_){} busyCheck=false;
+  }
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) check(); });
+  window.addEventListener('pageshow', e=>{ if(e.persisted) check(); });
+  setInterval(check, 10*60*1000); setTimeout(check, 4000);
+})();
 const typing = () => { const a=document.activeElement; return a && a.tagName==='INPUT' && $('#main').contains(a); };
 lsLoad(); render();
 (async()=>{
