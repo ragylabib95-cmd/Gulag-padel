@@ -504,6 +504,8 @@ summary{cursor:pointer;font-weight:600}
 .poll-bar span,.poll-bar b{position:relative}
 .poll-who{margin:4px 2px 0;font-size:13px;color:var(--muted)}
 .poll-note{font-size:13px;margin:8px 0 0}
+.owing{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#c0392b;color:#fff;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
+.btn.owe-on{background:#c0392b;border-color:#c0392b;color:#fff}
 .ann-list{margin:8px 0 0;padding:4px 16px 14px 44px;columns:2;column-gap:24px}
 .ann-list li{padding:5px 0;font-family:var(--display);font-weight:700;font-size:18px;break-inside:avoid}
 .ann-list li::marker{color:var(--muted);font-size:14px}
@@ -668,6 +670,7 @@ let settings={}, changelog=[];
 const DEFAULTS={win:10, tier:2, upset:10, carry:5, gulagLoss:3, fullWeeks:10, halfWeeks:20, seedBadges:6, liveBadges:4};
 const S = k => settings.rules && settings.rules[k]!=null ? settings.rules[k] : DEFAULTS[k];
 const isInactive = p => (settings.inactive||[]).includes(p);
+const isOwing = p => (settings.owing||[]).includes(p);
 function currentSeason(){ const c=(settings.seasons&&settings.seasons.current)||{}; return {name:c.name||'Season 1', start:c.start||null, end:null}; }
 function pastSeasons(){ return (settings.seasons&&settings.seasons.past)||[]; }
 function lsLoad(){ try{ const d=JSON.parse(localStorage.getItem(LS)||'{}'); roster=d.roster||[]; night=fix(d.night); nights=d.nights||[]; settings=d.settings||{}; changelog=d.changelog||[]; }catch(e){} }
@@ -1053,7 +1056,7 @@ function annView(){
     ${pollView(a)}
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
-    <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
+    <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${isOwing(r||p)?'<span class="owing">Owing</span>':''}${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
   </article>`;
 }
 function annForm(){
@@ -1531,6 +1534,7 @@ function lmView(){
   ${LMSEC('nights',`Nights (${hs.length})`,nightsBody,'Edit scores or delete')}
   ${LMSEC('manual','Add a past night',addNight)}
   ${dupSection()}
+  ${LMSEC('owing','Who owes money',owingSection(),(settings.owing||[]).length?`${(settings.owing||[]).length} owing`:'Shows “Owing” on the Announcement page')}
   ${LMSEC('excuse','Don’t count a night for a player',excuseSection(),'Unwell or injured')}
   ${LMSEC('rules','Seeding settings',rules)}
   ${LMSEC('seasons','Seasons',seasons, esc(cs.name))}
@@ -1692,6 +1696,7 @@ async function renamePlayer(old, nw, why){
   }
   const merged = !!(settings.inactive||[]).includes(nw) || false;
   if(settings.inactive) settings.inactive=[...new Set(settings.inactive.map(sw))];
+  if(settings.owing) settings.owing=[...new Set(settings.owing.map(sw))];
   if(settings.adjust) settings.adjust=settings.adjust.map(a=>({...a, name:sw(a.name)}));
   if(settings.ratings && settings.ratings[old]!=null){ if(settings.ratings[nw]==null) settings.ratings[nw]=settings.ratings[old]; delete settings.ratings[old]; }
   saveSettings(); logChange(why || `Renamed ${old} to ${nw}`, 'name');
@@ -1786,6 +1791,12 @@ function historyView(){
   }).join('');
 }
 let excuseNight=null, dupNights=[];
+function owingSection(){
+  const list=roster.filter(p=>!isInactive(p)).sort((a,b)=>a.localeCompare(b)), ow=(settings.owing||[]).filter(p=>roster.includes(p));
+  return `<p class="muted">Tap a name to mark them as owing. They get a red “Owing” next to their name on the Announcement page. Tap again once they’ve paid.</p>
+    ${ow.length?`<p><b>Owing:</b> ${ow.map(esc).join(', ')}</p>`:'<p class="muted">Nobody owes anything right now.</p>'}
+    <div class="row owe-chips">${list.map(p=>`<button class="btn sm${isOwing(p)?' owe-on':''}" data-owe="${esc(p)}" aria-pressed="${isOwing(p)}">${isOwing(p)?'✕ ':''}${esc(p)}</button>`).join('')}</div>`;
+}
 function dupSection(){
   if(!dupNights.length) return '';
   const by={}; dupNights.forEach(n=>{ const l=nightLabel(n); by[l]=(by[l]||0)+1; });
@@ -1952,6 +1963,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
   else if(d.vote){ const a=activeAnn(), nm0=($('#poll-name')||{}).value||pollName; if(a && nm0) castVote(a, nm0, d.vote); }
+  else if(d.owe){ const p=d.owe, on=!isOwing(p); settings.owing = on ? [...new Set([...(settings.owing||[]), p])] : (settings.owing||[]).filter(x=>x!==p); saveSettings(); logChange(`${on?'Marked as owing':'Paid up'}: ${p}`); render(); }
   else if(d.excuse){ toggleExcuse(d.excuse); }
   else if(d.sort){ seedSort = seedSort.key===d.sort ? {key:d.sort, dir:-seedSort.dir} : {key:d.sort, dir:d.sort==='name'?1:-1}; render(); }
   else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
