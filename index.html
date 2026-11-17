@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261117011502">
+<meta name="gp-build" content="20261117011757">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1063,7 +1063,7 @@ function annView(){
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
     <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${(a.dtd||[]).some(x=>(resolveName(x)||x)===(r||p))?'<span class="owing dtd">DTD</span>':''}${isOwing(r||p)?'<span class="owing">Owing</span>':''}${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
-    ${(a.dtd||[]).length?'<p class="ann-foot"><span class="owing dtd">DTD</span> Day to day: carrying a niggle or injury, so might pull out or play limited.</p>':''}
+    ${(a.dtd||[]).length?'<p class="ann-foot"><span class="owing dtd">DTD</span> Day to day: carrying a possible injury</p>':''}
   </article>`;
 }
 function annForm(){
