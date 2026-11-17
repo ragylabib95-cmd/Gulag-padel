@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261117010907">
+<meta name="gp-build" content="20261117011502">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -507,8 +507,10 @@ summary{cursor:pointer;font-weight:600}
 .poll-note{font-size:13px;margin:8px 0 0}
 .update-bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 16px;border:0;border-radius:12px;background:var(--fg);color:var(--bg);font:inherit;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .owing{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#c0392b;color:#fff;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
-.dtd-t{margin-left:6px;padding:1px 6px;border:1px solid #c0392b;border-radius:999px;background:none;color:#c0392b;font:inherit;font-size:10px;font-weight:800;letter-spacing:.05em;cursor:pointer}
-.dtd-t.on{background:#c0392b;color:#fff}
+.dtd-t{margin-left:6px;padding:1px 6px;border:1px solid #e07b1a;border-radius:999px;background:none;color:#c4650f;font:inherit;font-size:10px;font-weight:800;letter-spacing:.05em;cursor:pointer}
+.dtd-t.on{background:#e07b1a;color:#fff}
+.owing.dtd{background:#e07b1a}
+.ann-foot{margin:0;padding:0 16px 14px;font-size:12px;color:var(--muted)}
 .btn.owe-on{background:#c0392b;border-color:#c0392b;color:#fff}
 .ann-list{margin:8px 0 0;padding:4px 16px 14px 44px;columns:2;column-gap:24px}
 .ann-list li{padding:5px 0;font-family:var(--display);font-weight:700;font-size:18px;break-inside:avoid}
@@ -1061,6 +1063,7 @@ function annView(){
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
     <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${(a.dtd||[]).some(x=>(resolveName(x)||x)===(r||p))?'<span class="owing dtd">DTD</span>':''}${isOwing(r||p)?'<span class="owing">Owing</span>':''}${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
+    ${(a.dtd||[]).length?'<p class="ann-foot"><span class="owing dtd">DTD</span> Day to day: carrying a niggle or injury, so might pull out or play limited.</p>':''}
   </article>`;
 }
 function annForm(){
@@ -1072,7 +1075,7 @@ function annForm(){
     <label style="margin-top:8px">Message (optional, shown exactly as you type it)<textarea id="ann-headline" rows="4" class="copybox" placeholder="e.g. Back to Recess!">${esc(D.headline||'')}</textarea></label>
     <label style="margin-top:8px">Players (${D.players.length}${D.max?` / ${D.max}`:''})</label>
     <form class="row" id="annaddform"><input id="ann-p" autocomplete="off" placeholder="Type a player’s name" style="flex:1;min-width:0"><button class="btn sm" type="submit">Add</button></form>
-    <p class="muted" style="margin:6px 0 0;font-size:13px">Tap DTD to mark someone as day to day (shows in red on the announcement).</p>
+    <p class="muted" style="margin:6px 0 0;font-size:13px">Tap DTD to mark someone as day to day (shows in orange on the announcement).</p>
     <div class="chips" style="margin-top:8px">${D.players.map((p,i)=>{ const on=(D.dtd||[]).includes(p); return `<span class="chip on ann-chip">${i+1}. ${esc(p)}<button class="dtd-t${on?' on':''}" data-anndtd="${i}" aria-pressed="${on}" aria-label="${esc(p)} day to day">DTD</button><button class="x" data-annrm="${i}" aria-label="Remove ${esc(p)}">×</button></span>`; }).join('')}</div>
     <div class="row" style="margin-top:12px"><button class="btn primary" id="ann-save">${annEditId?'Save changes':'Schedule roster'}</button><button class="btn" id="ann-cancel">Cancel</button></div>${note('ann')}</div>`;
 }
