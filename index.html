@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261117012329">
+<meta name="gp-build" content="20261122081356">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1059,7 +1059,6 @@ function annView(){
   const ps=a.players||[], left=Math.max(0,(a.max||0)-ps.length);
   return `<article class="ann">
     <div class="ann-top"><span class="ann-eyebrow">Next game · ${esc(annWhen(a))}</span><h2 class="ann-title">${esc(a.title||'Padel')}</h2>${a.headline?`<p class="ann-head">${esc(a.headline)}</p>`:''}</div>
-    ${pollView(a)}
     <div class="ann-facts"><div><span>Venue</span><b>${esc(VENUES[a.venue]?VENUES[a.venue].name:a.venue||'TBC')}</b></div><div><span>Courts</span><b>${a.courts||'–'}</b></div><div><span>Time</span><b>${esc(a.time||'')}</b></div><div><span>Players</span><b>${ps.length}${a.max?` / ${a.max}`:''}</b></div></div>
     ${a.max?`<p class="ann-spots${left?'':' full'}">${left?`${left} spot${left>1?'s':''} left`:'Full'}</p>`:''}
     <ol class="ann-list">${ps.map(p=>{ const r=resolveName(p); return `<li><span>${esc(r||p)}</span>${(a.dtd||[]).some(x=>(resolveName(x)||x)===(r||p))?'<span class="owing dtd">DTD</span>':''}${isOwing(r||p)?'<span class="owing">Owing</span>':''}${unlocked&&!r?'<span class="tagx warn">Not in player list</span>':''}</li>`; }).join('')}</ol>
@@ -1661,7 +1660,7 @@ function liveView(ro){
   ${n>1&&night.round>=2?(()=>{ const nowOn = night.kotc===true;
     const state = nowOn&&C[0]&&C[0].kotc ? 'On' : nowOn&&C[0]&&!C[0].wait&&night.log.length&&kingsDone(C[0],night.log) ? 'On · kings split after 2 together' : nowOn ? 'On from next round' : 'Off';
     const la=lastAnn(), PV=la?pollVotes(la):[], pollTxt=PV.length?` · Poll: ${PV.filter(v=>v.vote==='yes').length} yes, ${PV.filter(v=>v.vote==='no').length} no`:'';
-    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}${pollTxt}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
+    return `<div class="kotc-row"><span class="kotc-lab">${crownSvg()}King of the court <span class="muted">Tier 1: ${state}</span></span>${ro?'':`<button class="kswitch${nowOn?' on':''}" id="kotc-toggle" role="switch" aria-checked="${nowOn}" aria-label="King of the court"><span></span></button>`}</div>`; })():''}
   ${confirming==='next'?'':check}${canUndo&&confirming!=='undo'&&confirming!=='next'?`<div class="undo-row"><button class="btn sm" id="undo">Undo last round</button></div>`:''}
   <p class="muted tap-hint">${!ro?'Tap a player’s name if they leave early. Press and hold a name, then drag it onto another player or a sub to swap them. ':''}${Object.keys(liveTop).length?`<span class="liveno">(1)</span> is tonight’s live top ${S('liveBadges')}`:''}${Object.keys(liveTop).length&&Object.keys(seedTop).length?', ':''}${Object.keys(seedTop).length?'<span class="seedno">(1)</span> is the overall seed':''}${Object.keys(liveTop).length||Object.keys(seedTop).length?'.':''}</p>
   ${carryView(ro)}
