@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261122081356">
+<meta name="gp-build" content="20261122082021">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -59,6 +59,9 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px
 .d-sub{font-family:var(--display);font-weight:600;font-size:clamp(14px,4.1vw,19px);letter-spacing:.03em;margin-top:10px;opacity:.9}
 .d-warn{font-family:var(--display);font-weight:800;letter-spacing:.04em;font-size:clamp(12px,3.6vw,16px);margin-top:6px;opacity:.7}
 body.bgvid #bgvid{display:block}
+.vid-play{display:none;position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(0,0,0,.55);z-index:2;pointer-events:none}
+.vid-play::after{content:"";position:absolute;left:26px;top:20px;border-style:solid;border-width:12px 0 12px 20px;border-color:transparent transparent transparent #fff}
+#bgvid.needs-tap .vid-play{display:block}
 @media (max-width:520px){#bgvid{margin-left:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1*max(16px,env(safe-area-inset-right,0px)));border-radius:0;margin-top:-12px}}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court)}
 .wrap{max-width:720px;margin:0 auto;padding-block:12px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -609,7 +612,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
   </header>
 </div></div>
 <div class="wrap">
-  <div id="bgvid" aria-hidden="true"><video data-for="seed" muted loop playsinline preload="metadata" poster="media/gulag-smash.jpg" disablepictureinpicture><source src="media/gulag-smash.mp4" type="video/mp4"></video><video data-for="ann" muted loop playsinline preload="metadata" poster="media/debt-collector.jpg" disablepictureinpicture><source src="media/debt-collector.mp4" type="video/mp4"></video><div class="debt-ov"><p class="d-kick">Introducing our very own</p><div class="d-low"><p class="d-brand">Gulag Padel</p><p class="d-title">Debt Collector</p><p class="d-sub">You know what you owe.</p><p class="d-warn">Beem it.</p></div></div></div>
+  <div id="bgvid" aria-hidden="true"><span class="vid-play" aria-hidden="true"></span><video data-for="seed" muted loop playsinline preload="metadata" poster="media/gulag-smash.jpg" disablepictureinpicture><source src="media/gulag-smash.mp4" type="video/mp4"></video><video data-for="ann" muted loop playsinline preload="metadata" poster="media/debt-collector.jpg" disablepictureinpicture><source src="media/debt-collector.mp4" type="video/mp4"></video><div class="debt-ov"><p class="d-kick">Introducing our very own</p><div class="d-low"><p class="d-brand">Gulag Padel</p><p class="d-title">Debt Collector</p><p class="d-sub">You know what you owe.</p><p class="d-warn">Beem it.</p></div></div></div>
   <nav role="tablist">
     <button role="tab" data-tab="ann" aria-selected="false" hidden>Announcement</button>
     <button role="tab" data-tab="seed" aria-selected="true">Seeding</button>
@@ -1328,11 +1331,13 @@ function bgVideo(){
   const show = tab==='seed' || tab==='ann', box=document.querySelector('#bgvid');
   document.body.classList.toggle('bgvid', show); if(!box) return;
   box.classList.toggle('tall', tab==='ann');
-  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // iPhones block autoplay in Low Power Mode; if that happens, a play button shows and the first tap anywhere starts it
   box.querySelectorAll('video').forEach(v=>{ const mine = show && v.dataset.for===tab; v.classList.toggle('on', mine);
-    if(mine && !still){ if(v.paused){ const pr=v.play(); if(pr&&pr.catch) pr.catch(()=>{}); } } else if(!v.paused) v.pause(); });
+    if(mine){ v.muted=true; v.playsInline=true; if(v.paused){ const pr=v.play(); if(pr&&pr.then) pr.then(()=>box.classList.remove('needs-tap'), ()=>box.classList.add('needs-tap')); } }
+    else if(!v.paused) v.pause(); });
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) document.querySelectorAll('#bgvid video').forEach(v=>v.pause()); else bgVideo(); });
+['touchend','click'].forEach(ev=>document.addEventListener(ev, ()=>{ const b=document.querySelector('#bgvid'); if(b && b.classList.contains('needs-tap')) bgVideo(); }, {passive:true}));
 function render(){
   refreshSeeds(); refreshLive();
   { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann'; }
