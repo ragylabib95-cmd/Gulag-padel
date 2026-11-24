@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261124203919">
+<meta name="gp-build" content="20261124204729">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -518,6 +518,7 @@ summary{cursor:pointer;font-weight:600}
 .close-row{gap:10px;align-items:center;margin:-4px 0 14px}
 .close-row .muted{font-size:13px}
 .close-court{margin:0 0 14px}
+.state.flip1{border:0;cursor:pointer;font:inherit;background:var(--ball);color:var(--ball-fg);font-weight:800}
 .arrive-box{border:1px dashed var(--line);border-radius:12px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px}
 .arrive-box h3{margin:0;font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase}
 .arrive-box p{margin:0}
@@ -1452,7 +1453,7 @@ function setupView(){
 const crownSvg = () => `<svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15 1 4l6 5 5-8 5 8 6-5-1 11z"/><rect x="2" y="15.5" width="20" height="2.5" rx="1"/></svg>`;
 function courtView(c,i,n,ro){
   const g = n>1 && i===n-1, tag=courtTag(i,n);
-  const st = !c.pairs ? '<span class="state">Pick partners</span>' : c.winner==null ? '<span class="state playing">Playing</span>' : '<span class="state">Done</span>';
+  const st = !c.pairs ? (ro ? '<span class="state">Pick partners</span>' : `<button class="state flip1" data-flip1="${i}">Flip this court</button>`) : c.winner==null ? '<span class="state playing">Playing</span>' : '<span class="state">Done</span>';
   let body;
   if(c.wait){
     const slot=(key)=>c[key].map((p,gi)=>{ if(p) return nm(p); const w=c.wait.find(x=>x.key===key&&x.gi===gi); return `<span class="waiting-for">${w?esc(waitLab(w)):'To come'}</span>`; }).join('<br>');
@@ -2081,6 +2082,7 @@ $('#main').addEventListener('click', async e=>{
   else if(t.id==='start') startNight();
   else if(t.id==='start-partial') startNight(true);
   else if(t.id==='draw') openFlip();
+  else if(d.flip1!=null) openFlip(+d.flip1);
   else if(t.id==='next'){ confirming='next'; render(); const nb=$('#next-block'); if(nb) nb.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); }
   else if(t.id==='next-yes') nextRound();
   else if(t.id==='ann-new'){ const nx=new Date(); nx.setDate(nx.getDate()+((2-nx.getDay()+7)%7||7)); nx.setHours(19,30,0,0); annDraft={startLocal:toLocalInput(nx.toISOString()), end:'22:00', venue:night.setup.venue||'recess', courts:4, max:18, when:'24h', headline:'', players:[]}; annEditId=null; lmMsg.ann=null; render(); }
@@ -2254,7 +2256,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet){ sheet=n
 
 /* ---------- the flip ---------- */
 let flipQ=[], flipI=0, spin=0, busy=false;
-function openFlip(){ refreshSeeds(); flipQ = night.courts.map((c,i)=>i).filter(i=>!night.courts[i].pairs && !night.courts[i].wait); if(!flipQ.length) return; flipI=0; $('#flip').hidden=false; document.body.style.overflow='hidden'; showFlip(); }
+function openFlip(only){ refreshSeeds(); flipQ = night.courts.map((c,i)=>i).filter(i=>!night.courts[i].pairs && !night.courts[i].wait && (only==null || i===only)); if(!flipQ.length) return; flipI=0; $('#flip').hidden=false; document.body.style.overflow='hidden'; showFlip(); }
 function closeFlip(){ $('#flip').hidden=true; document.body.style.overflow=''; saveNight(); render(); }
 function showFlip(){
   const i=flipQ[flipI], c=night.courts[i], n=night.courts.length;
