@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261124052429">
+<meta name="gp-build" content="20261124054550">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -393,6 +393,11 @@ th.mvh,td.mvc{width:40px;text-align:center;padding-left:2px;padding-right:2px}
 .slot b{font-family:var(--display);font-weight:700;font-size:19px;line-height:1.15;display:block;overflow-wrap:anywhere}
 .bench{padding:10px 14px;border-radius:10px;border:1px dashed var(--line);margin-bottom:14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .bench b{font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase}
+.bench-body{flex-basis:100%}
+.bench-list{margin:2px 0 6px;padding-left:1.6em;display:flex;flex-direction:column;gap:4px}
+.bench-list li{padding-left:2px}
+.bench-list li.next{font-weight:700}
+.bench-list .mv{margin-left:8px}
 
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
@@ -1685,7 +1690,7 @@ function liveView(ro){
   ${!ro && !K && night.planned && n<night.planned ? (night.bench.length>=4
     ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button><p class="muted" style="margin:6px 0 0;font-size:13px">Court not free yet? Leave it. Everyone keeps playing as subs until you tap.</p></div>`
     : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Mark people as they arrive below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
-  <div class="bench"><b>${n===1?'Sitting out':'Gulag subs'}</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:n===1?'<br>One court: teams are reshuffled every game and everyone takes turns sitting out':'<br>The first two come on next'):n===1?'Teams are reshuffled every game.':'No subs waiting. Gulag losers stay on.'}</span>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
+  <div class="bench"><b>${n===1?'Sitting out':'Gulag subs'}</b><div class="bench-body">${night.bench.length?`<ol class="bench-list">${night.bench.map((p,i)=>`<li${n>1&&i<(sl?1:2)?' class="next"':''}>${pb(p,ro)}${n>1&&i<(sl?1:2)?'<span class="mv mv-on">Next on</span>':''}</li>`).join('')}</ol>${sl?`<span class="muted">${esc(sl.first)} comes on next, with the point slam winner</span>`:n===1?'<span class="muted">One court: teams are reshuffled every game and everyone takes turns sitting out</span>':''}`:`<span class="muted">${n===1?'Teams are reshuffled every game.':'No subs waiting. Gulag losers stay on.'}</span>`}</div>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
   ${!ro&&nextOk?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round${early?` <small>(${playing} still playing)</small>`:''}</button>${early?`<p class="muted next-note">Courts that finished move on now. ${playing===1?'The game still going stays':'The games still going stay'} on screen to score.</p>`:''}`}</div>`
     :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
