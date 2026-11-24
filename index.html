@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261124061421">
+<meta name="gp-build" content="20261124054550">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -514,14 +514,6 @@ summary{cursor:pointer;font-weight:600}
 .poll-who{margin:4px 2px 0;font-size:13px;color:var(--muted)}
 .poll-note{font-size:13px;margin:8px 0 0}
 .update-bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 16px;border:0;border-radius:12px;background:var(--fg);color:var(--bg);font:inherit;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.checkin{border:2px solid var(--ball);background:color-mix(in srgb,var(--ball) 14%,var(--surface));border-radius:14px;padding:14px;margin:0 0 16px}
-.checkin h3{margin:0 0 4px;font-family:var(--display);font-weight:800;font-size:22px;text-transform:uppercase}
-.checkin .muted{margin:0 0 10px;font-size:14px}
-.checkin select{flex:1;min-width:0;font-size:16px}
-.checkin .btn{font-size:16px}
-.ci-done{margin:0 0 8px;font-weight:600}
-.ci-pend{margin:10px 0 0 !important}
-.checkin-banner{display:block;width:100%;margin:0 0 14px;padding:12px 14px;border:2px solid var(--ball);border-radius:12px;background:color-mix(in srgb,var(--ball) 18%,var(--surface));color:var(--fg);font:inherit;text-align:left;cursor:pointer}
 .arrive-box{border:1px dashed var(--line);border-radius:12px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px}
 .arrive-box .muted{font-size:13px}
 .arrive-box select{flex:1;min-width:0}
@@ -1006,37 +998,6 @@ function leaveOptions(p){
     return {...o, title, moves, restarts, breaks:n1<n0};
   });
 }
-/* ---------- self check-in for latecomers (no login): saved as a 'yes' in the public votes collection, so no new
-   database permissions are needed. Any ref's or the LM's phone then adds them to the subs in check-in order. ---------- */
-let ciName=null; try{ ciName=localStorage.getItem('gp-poll-name'); }catch(_){}
-const checkinPoll = () => night.phase==='live' && night.startedAt ? 'checkin-'+nightId(night.startedAt) : null;
-function inPlaySet(){ return new Set([...night.bench, ...night.courts.flatMap(c=>[...c.a,...c.b]), ...(night.carry?night.carry.courts.flatMap(g=>g.pairs.flat()):[])]); }
-function checkins(){ const cp=checkinPoll(); return cp ? votes.filter(v=>v.poll===cp && v.vote==='yes').sort((a,b)=>a.at<b.at?-1:1) : []; }
-function dueNames(){ const la=lastAnn(); if(!la || night.phase!=='live') return []; const here=new Set([...inPlaySet(), ...night.arrivals, ...checkins().map(v=>v.name)]);
-  return (la.players||[]).map(p=>resolveName(p)||p).filter(p=>!here.has(p)); }
-function processCheckins(){
-  if(!ref || night.phase!=='live') return; const here=inPlaySet(); let changed=false;
-  checkins().forEach(v=>{ if(!here.has(v.name) && !night.arrivals.includes(v.name)){ night.bench.push(v.name); night.arrivals.push(v.name); night.left=night.left.filter(x=>x!==v.name); here.add(v.name); changed=true; logChange(`${v.name} checked in (late arrival)`); } });
-  if(changed) saveNight();
-}
-async function checkIn(name){
-  const cp=checkinPoll(); if(!cp || !name) return; ciName=name; try{ localStorage.setItem('gp-poll-name',name); }catch(_){}
-  if(ref){ addArrival(name); return; }
-  if(!db || !db.raw){ setStatus('Checking in needs a connection', true); return; }
-  const rec={poll:cp, name, vote:'yes', at:new Date().toISOString()}; votes=[...votes, rec]; render();
-  try{ await db.raw('votes/'+voteKey(cp,name)).set(rec); setStatus(`Checked in. Welcome, ${name}`); }
-  catch(e){ votes=votes.filter(v=>v!==rec); setStatus('Couldn’t check in. Try again', true); render(); }
-}
-function checkinCard(){
-  if(night.phase!=='live' || !lastAnn()) return '';
-  const due=dueNames(), mine=ciName && (inPlaySet().has(ciName) || checkins().some(v=>v.name===ciName)) ? ciName : null;
-  const pos=mine?night.bench.indexOf(mine):-1, pending=checkins().filter(v=>!inPlaySet().has(v.name)).map(v=>v.name);
-  if(!due.length && !mine && !pending.length) return '';
-  return `<section class="checkin">${mine?`<p class="ci-done">✓ ${esc(mine)}, you’re checked in${pos>=0?`: <b>sub #${pos+1}</b> in the queue`:inPlaySet().has(mine)?'':', joining the subs'}.</p>`:''}
-    ${due.length?`<h3>Just arrived? Check in</h3><p class="muted">Pick your name so you join the subs queue in the order you got here.</p>
-    <div class="row"><select id="ci-sel" aria-label="Your name"><option value="">Pick your name…</option>${due.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button class="btn primary" id="ci-go">I’m here</button></div>`:''}
-    ${pending.length?`<p class="muted ci-pend">Joining the subs: ${pending.map(esc).join(', ')}</p>`:''}</section>`;
-}
 function addArrival(v){
   if(!roster.includes(v)){ roster.push(v); saveRoster(); logChange(`Added new player ${v} (late arrival)`, 'name'); }
   const inPlay = night.courts.some(c=>[...c.a,...c.b].includes(v)) || night.bench.includes(v);
@@ -1395,16 +1356,14 @@ document.addEventListener('visibilitychange', ()=>{ if(document.hidden) document
 ['touchend','click'].forEach(ev=>document.addEventListener(ev, ()=>{ const b=document.querySelector('#bgvid'); if(b && b.classList.contains('needs-tap')) bgVideo(); }, {passive:true}));
 function render(){
   refreshSeeds(); refreshLive();
-  { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann';
-    if(!has && !userPickedTab && tab==='seed' && night.phase==='live' && dueNames().length) tab='night'; /* latecomers land on the check-in */ }
+  { const has=!!activeAnn(), b=document.querySelector('nav [data-tab="ann"]'); if(b) b.hidden=!has; if(!has && tab==='ann') tab='seed'; if(has && !userPickedTab && tab==='seed') tab='ann'; }
   const v = night.phase==='live' ? night.venue : night.setup.venue;
   document.documentElement.dataset.venue = tab==='night' && v ? v : (night.phase==='live' && night.venue) ? night.venue : 'recess';
   const shown = (tab==='night' && v) || (night.phase==='live' && night.venue);
   $('#venue-name').textContent = shown && VENUES[shown] ? VENUES[shown].name : '';
   document.querySelectorAll('nav button').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===tab));
   bgVideo();
-  const ciBanner = tab!=='night' && tab!=='lm' && night.phase==='live' && dueNames().length ? `<button class="checkin-banner" id="ci-banner">Just arrived at padel? <b>Check in here →</b></button>` : '';
-  $('#main').innerHTML = ciBanner + (tab==='night' ? (night.phase==='live' ? (ref ? `<div class="live-drag">${liveView(false)}</div>` : liveView(true)) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView());
+  $('#main').innerHTML = tab==='night' ? (night.phase==='live' ? (ref ? `<div class="live-drag">${liveView(false)}</div>` : liveView(true)) : ref ? setupView() : lockView()) : tab==='seed' ? seedView() : tab==='ann' ? annView() : tab==='lm' ? lmView() : tab==='acct' ? acctView() : historyView();
 }
 const pts = n => `<span class="pts">${n}</span>`;
 function rankTable(rows, opts={}){
@@ -1715,7 +1674,6 @@ function liveView(ro){
     check=`<div class="confirm"><p>Go back to round ${night.round-1}? Courts, partners and scores return to how they were before you tapped Next round. Anything changed since then is cleared.</p><div class="row"><button class="btn danger" id="undo-yes">Undo last round</button><button class="btn" id="end-no">Keep this round</button></div></div>`;
   }
   return `
-  ${checkinCard()}
   ${ro?'':roundTabs()}
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${night.round}</h2>${top}</div>
   ${!ro&&(night.leaveUndo||[]).length?(()=>{ const u=night.leaveUndo[night.leaveUndo.length-1];
@@ -1738,7 +1696,8 @@ function liveView(ro){
     :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
   ${ro?'':(()=>{ const la=lastAnn(), here=new Set([...night.arrivals, ...night.bench, ...night.courts.flatMap(c=>[...c.a,...c.b])]);
       const due=la?(la.players||[]).map(p=>resolveName(p)||p).filter(p=>!here.has(p)):[];
-      return `<div class="arrive-box"><b>Someone not on the roster?</b><span class="muted">${la?(due.length?'Rostered players check in with the box at the top of this page.':'Everyone on today’s roster is here.'):'Add late arrivals here.'}</span>
+      return `<div class="arrive-box"><b>Who’s just arrived?</b>${due.length?`<span class="muted">Pick them from today’s roster as they turn up. They join the subs in the order they arrive.</span>
+        <div class="row"><select id="arrive-sel" aria-label="Player who just arrived"><option value="">Today’s roster (${due.length} still to come)…</option>${due.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button class="btn sm primary" id="arrive-add">Arrived</button></div>`:la?'<span class="muted">Everyone on today’s roster is here.</span>':''}
         <form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Someone not on the roster" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form></div>`; })()}
   <h2>Tonight’s ranking</h2>
   ${tonightGames().length?rankTable(tonight(),{left:night.left}):'<p class="muted">Fills in as scores go in.</p>'}
@@ -2128,8 +2087,6 @@ $('#main').addEventListener('click', async e=>{
     const fallback=()=>{ copyFallback=key; render(); const b=$('#copybox'); if(b){ b.focus(); b.select(); } };
     try{ navigator.clipboard.writeText(txt).then(()=>{ copied=key; copyFallback=null; render(); }, fallback); }catch(err){ fallback(); } }
   else if(t.id==='addcourt') addCourtFromSubs();
-  else if(t.id==='ci-go'){ const v=($('#ci-sel')||{}).value; if(v) checkIn(v); else setStatus('Pick your name first', true); }
-  else if(t.id==='ci-banner'){ userPickedTab=true; tab='night'; render(); window.scrollTo(0,0); }
   else if(t.id==='arrive-add'){ const v=($('#arrive-sel')||{}).value; if(v) addArrival(v); }
   else if(t.id==='start-later'){ startNight(false, night.setup.courts-1); }
   else if(d.opt){ const [ci,k]=d.opt.split(':').map(Number), c=night.courts[ci]; c.pairs=allOptions(c)[k]; c.face='picked'; saveNight(); render(); }
@@ -2266,9 +2223,9 @@ lsLoad(); render();
   const lost = ()=>setStatus('Lost connection. Reload the page', true);
   db.doc('club/settings').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/settings')) return; settings = s.exists ? JSON.parse(JSON.stringify(s.data())) : {}; if(!userPickedTab && tab==='seed' && activeAnn()) tab='ann'; if(!typing()) render(); }, ()=>{});
   db.doc('club/changelog').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/changelog')) return; changelog = s.exists ? JSON.parse(JSON.stringify(s.data().entries||[])) : []; if(tab==='lm' && !typing()) render(); }, ()=>{});
-  if(db.rawCol) db.rawCol('votes').onSnapshot(q=>{ votes=q.docs.map(d=>d.data()); processCheckins(); if(!typing()) render(); }, ()=>{});
+  if(db.rawCol) db.rawCol('votes').onSnapshot(q=>{ votes=q.docs.map(d=>d.data()); if(!typing()) render(); }, ()=>{});
   db.doc('club/roster').onSnapshot(s=>{ if(s.metadata.hasPendingWrites || busyPath('club/roster')) return; roster = s.exists ? (s.data().players||[]) : []; if(!typing()) render(); }, lost);
-  db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); processCheckins(); if($('#flip').hidden && !typing()) render(); }, lost);
+  db.doc('club/tonight').onSnapshot(s=>{ if(busy || s.metadata.hasPendingWrites || busyPath('club/tonight')) return; night = fix(s.exists ? JSON.parse(JSON.stringify(s.data())) : null); if($('#flip').hidden && !typing()) render(); }, lost);
   db.collection('nights').onSnapshot(q=>{ if(window.__splashReady) window.__splashReady(); { const all=q.docs.map(d=>({...JSON.parse(JSON.stringify(d.data())), _id:d.id})); /* deep copy: delivered data is frozen, and renames/edits change it in place */
     // copies of the same night (same start time) only count once; the LM can delete the spares in LM Tools
     const seen=new Map(); dupNights=[]; all.forEach(n=>{ const o=seen.get(n.date); if(!o) seen.set(n.date,n); else if((n.games||[]).length>(o.games||[]).length){ dupNights.push(o); seen.set(n.date,n); } else dupNights.push(n); }); nights=[...seen.values()]; } if(!typing()) render(); }, ()=>{});
