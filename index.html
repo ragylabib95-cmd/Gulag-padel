@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261124062334">
+<meta name="gp-build" content="20261124203722">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -526,6 +526,22 @@ summary{cursor:pointer;font-weight:600}
 .arrive-box .muted{font-size:13px}
 .arrive-box select{flex:1;min-width:0}
 .later-court{margin-top:12px}
+.plink{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--muted);text-underline-offset:3px}
+.pf-name{margin:0}
+.pf-sub{margin:4px 0 14px}
+.pf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pf-people{grid-template-columns:repeat(2,1fr)}
+.pf-stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.pf-stat span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.pf-stat b{font-family:var(--display);font-size:24px;font-weight:800;line-height:1.1;overflow-wrap:anywhere}
+.pf-people .pf-stat b{font-size:19px}
+.pf-stat small{font-size:12px;color:var(--muted);display:block;font-family:var(--body);font-weight:400}
+.pf-h{margin:18px 0 8px}
+.pf-games{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.pf-games th,.pf-games td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.pf-games .n{text-align:right;white-space:nowrap}
+.pf-games tr.w b{color:#1a7f37}.pf-games tr.l b{color:#c0392b}
+@media (max-width:420px){.pf-grid{grid-template-columns:repeat(2,1fr)}}
 .owing{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#c0392b;color:#fff;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
 .dtd-t{margin-left:6px;padding:1px 6px;border:1px solid #e07b1a;border-radius:999px;background:none;color:#c4650f;font:inherit;font-size:10px;font-weight:800;letter-spacing:.05em;cursor:pointer}
 .dtd-t.on{background:#e07b1a;color:#fff}
@@ -1749,7 +1765,53 @@ async function renamePlayer(old, nw, why){
   renaming=null; renameErr=''; setStatus('Name updated'); render();
 }
 const nightLabel = nt => new Date(nt.date).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}) + (nt.venue&&VENUES[nt.venue] ? ' · '+VENUES[nt.venue].name : '');
+/* ---------- player profile: tap a name on the ladder ---------- */
+let profile=null;
+function profileView(p){
+  const H=history(), seasonRows=seeding(), pos=seasonRows.filter(r=>r.seed>0).findIndex(r=>r.name===p), me=seasonRows.find(r=>r.name===p)||{seed:0};
+  const LS=(ladderStats().stats||{})[p]||{ppg:0,best:0};
+  const fmtD=d=>new Date(d).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  let tot={n:0,w:0,g:0,gw:0,gl:0,pts:0,t1:0,gul:0,gulL:0,kings:0}, streak=0, bestStreak=0, bestNight=null, peak=1000;
+  const mates={}, opps={}, rows=[];
+  H.nights.forEach(({nt,st},i)=>{
+    const games=(nt.games||[]).filter(g=>g.pairs&&g.winner!=null&&g.pairs.some(pr=>pr.includes(p))).sort((a,b)=>a.round-b.round||a.court-b.court);
+    if(!games.length) return;
+    const counted=!!st[p], r=st[p], place=counted?rank(st).findIndex(x=>x.name===p)+1:null;
+    const after=i+1<H.nights.length?H.nights[i+1].before:H.elo; if(counted) peak=Math.max(peak, rate(after,p));
+    if(counted){ tot.n++; tot.pts+=r.pts; if(!bestNight||r.pts>bestNight.pts) bestNight={pts:r.pts,date:nt.date}; }
+    const gl=games.map(g=>{ const t=g.pairs[0].includes(p)?0:1, won=g.winner===t, mate=g.pairs[t].find(x=>x!==p), opp=g.pairs[1-t], n=g.courts||1;
+      const sc=g.score&&g.score[0]!=null?[g.score[t],g.score[1-t]]:null;
+      if(counted){ tot.g++; if(won) tot.w++; if(sc){ tot.gw+=sc[0]; tot.gl+=sc[1]; } if(g.court===0) tot.t1++; if(n>1&&g.court===n-1){ tot.gul++; if(!won) tot.gulL++; } if(g.kotc&&won&&g.court===0) tot.kings++;
+        streak=won?streak+1:0; bestStreak=Math.max(bestStreak,streak);
+        const m=mates[mate]=mates[mate]||{g:0,w:0}; m.g++; if(won) m.w++;
+        opp.forEach(o=>{ const x=opps[o]=opps[o]||{g:0,w:0}; x.g++; if(won) x.w++; }); }
+      return {g, won, mate, opp, sc, n}; });
+    rows.push({nt, counted, r, place, size:Object.keys(st).length, gl});
+  });
+  const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
+  const best=(obj,score,min)=>Object.entries(obj).filter(([,x])=>x.g>=min).sort((a,b)=>score(b[1])-score(a[1])||b[1].g-a[1].g)[0];
+  const often=best(mates,x=>x.g,1), bestMate=best(mates,x=>x.w/x.g,3), nemesis=best(opps,x=>(x.g-x.w)/x.g,3), victim=best(opps,x=>x.w/x.g,3);
+  const stat=(lab,val,sub)=>`<div class="pf-stat"><span>${lab}</span><b>${val}</b>${sub?`<small>${sub}</small>`:''}</div>`;
+  const who=(e,f)=>e?`${esc(e[0])}<small>${f(e[1])}</small>`:'–';
+  return `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><button class="btn sm" id="prof-back">← Seeding</button></div>
+  <h2 class="pf-name">${esc(p)}${isInactive(p)?' <span class="muted" style="font-size:.5em">(inactive)</span>':''}</h2>
+  <p class="muted pf-sub">${pos>=0?`Seed #${pos+1} · ${pts(me.seed)} seed points`:'Not seeded right now'} · Rating ${Math.round(rate(H.elo,p))}${peak>1000?` (peak ${Math.round(peak)})`:''}</p>
+  ${tot.g?`<div class="pf-grid">
+    ${stat('Nights',tot.n)}${stat('Matches',`${tot.w}–${tot.g-tot.w}`,pct(tot.w,tot.g)+' won')}${stat('Games',`${tot.gw}–${tot.gl}`,pct(tot.gw,tot.gw+tot.gl)+' won')}
+    ${stat('Points',tot.pts,(tot.pts/tot.g).toFixed(1)+' per match')}${stat('This season',LS.ppg?LS.ppg.toFixed(1):'–','pts per match')}${stat('Best night',bestNight?bestNight.pts:'–',bestNight?new Date(bestNight.date).toLocaleDateString(undefined,{day:'numeric',month:'short'}):'')}
+    ${stat('Win streak',bestStreak,'best in a row')}${stat('Tier 1',tot.t1,pct(tot.t1,tot.g)+' of matches')}${stat('The Gulag',tot.gul,`${tot.gulL} lost there`)}${stat('King wins',tot.kings,'won as king of the court')}
+  </div>
+  <div class="pf-grid pf-people">
+    ${stat('Most played with',who(often,x=>`${x.g} matches, ${x.w} won`))}${stat('Best partner',who(bestMate,x=>`${pct(x.w,x.g)} won (${x.g})`))}
+    ${stat('Toughest opponent',who(nemesis,x=>`lost ${x.g-x.w} of ${x.g}`))}${stat('Favourite opponent',who(victim,x=>`won ${x.w} of ${x.g}`))}
+  </div>`:'<div class="banner">No matches saved yet.</div>'}
+  ${rows.length?`<h3 class="pf-h">History</h3>${rows.slice().reverse().map(x=>`<details class="night pf-night"><summary><b>${fmtD(x.nt.date)}</b><span class="muted">${x.counted?`${x.r.pts} pts · ${x.r.w}–${x.r.g-x.r.w} · ${x.place}${['st','nd','rd'][x.place-1]||'th'} of ${x.size}`:'Not counted'}${x.nt.venue&&VENUES[x.nt.venue]?' · '+esc(VENUES[x.nt.venue].name):''}</span></summary>
+    <table class="pf-games"><thead><tr><th>Rd</th><th>Court</th><th>With</th><th>Against</th><th class="n">Score</th></tr></thead><tbody>
+    ${x.gl.map(y=>`<tr class="${y.won?'w':'l'}"><td>${y.g.round}</td><td>${courtName(y.g.court,y.n)}${y.g.kotc&&y.g.court===0?' ♛':''}</td><td>${esc(y.mate||'')}</td><td>${y.opp.map(esc).join(' &amp; ')}</td><td class="n"><b>${y.won?'W':'L'}</b> ${y.sc?`${y.sc[0]}–${y.sc[1]}`:''}</td></tr>`).join('')}
+    </tbody></table></details>`).join('')}`:''}`;
+}
 function seedView(){
+  if(profile) return profileView(profile);
   const h=history().nights.reverse();
   const past=pastSeasons(), cs=currentSeason();
   if(seedSel!=='overall' && !String(seedSel).startsWith('season:') && !h.some(x=>x.nt.date===seedSel)) seedSel='overall';
@@ -1800,7 +1862,7 @@ function seedView(){
   return `<h2>Seeding</h2>${refBar()}${sel}<p class="muted">${past.length?`${esc(cs.name)}. `:''}${K==='seed'?`Points from the last ${S('fullWeeks')} weeks count in full and weeks ${S('fullWeeks')+1} to ${S('halfWeeks')} count half, so regulars who keep winning rise and a one-off big night fades. Beating a stronger team earns up to ${S('upset')} bonus points.`:`Sorted by <b>${esc(COLS.find(c=>c[0]===K)?COLS.find(c=>c[0]===K)[1]:'name')}</b>. ${esc(expl[K]||'')} <button class="linkbtn" data-sort="seed">Back to seed points</button>`} Tap a column heading to sort by it${seasonNights.length>1&&K!=='name'?'; arrows show the change since last week in that column':''}.</p>
   <div class="tablewrap ladder-wrap"><table class="ladder"><thead><tr><th class="stick0"></th>${K!=='name'?'<th class="mvh" title="Change since last week">+/–</th>':''}<th class="stick1"><button class="sorth${K==='name'?' on':''}" data-sort="name">Player${K==='name'?(seedSort.dir<0?' ▼':' ▲'):''}</button></th>${COLS.map(th).join('')}<th></th></tr></thead><tbody>
   ${rows.map(r=>{ const ranked=ok(r), n=ranked?++pos:null; const split='';
-    return `${split}<tr class="${n===1&&K==='seed'?'top':''}${!ranked?' unranked':''}"><td class="rank stick0">${n||'–'}</td>${K!=='name'?`<td class="mvc">${ranked?moveCell(r.name,nowRank[r.name]):''}</td>`:''}<td class="stick1">${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`<span class="pname">${esc(r.name)}</span>${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td>${COLS.map(c=>cell(c[0],r)).join('')}<td></td></tr>`; }).join('')}
+    return `${split}<tr class="${n===1&&K==='seed'?'top':''}${!ranked?' unranked':''}"><td class="rank stick0">${n||'–'}</td>${K!=='name'?`<td class="mvc">${ranked?moveCell(r.name,nowRank[r.name]):''}</td>`:''}<td class="stick1">${renaming===r.name?`<form class="rename" id="renameform"><input id="rename-in" value="${esc(r.name)}" autocomplete="off" aria-label="New name for ${esc(r.name)}"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" id="rename-no">Cancel</button>${renameErr?`<span class="err-text">${esc(renameErr)}</span>`:''}</form>`:`${editNames?`<span class="pname">${esc(r.name)}</span>`:`<button class="pname plink" data-prof="${esc(r.name)}">${esc(r.name)}</button>`}${editNames?`<button class="edit-n" data-ren="${esc(r.name)}" aria-label="Edit ${esc(r.name)}’s name">Rename</button>`:''}`}</td>${COLS.map(c=>cell(c[0],r)).join('')}<td></td></tr>`; }).join('')}
   </tbody></table></div>
   <div class="actions">${!unlocked?'':`<button class="btn${editNames?' primary':''}" id="editnames">${editNames?'Done editing':'Edit names'}</button>${editNames?'<span class="muted">Tap Rename to fix a spelling, </span>':''}`}</div>
   ${(()=>{ const cs=currentSeason(), A=(settings.adjust||[]).filter(a=>!cs.start||a.at>=cs.start); return A.length?`<p class="muted adj-note">Includes point adjustments: ${A.map(a=>`${esc(a.name)} ${a.pts>0?'+':''}${a.pts}${a.reason?` (${esc(a.reason)})`:''}`).join(', ')}.</p>`:''; })()}
@@ -1899,7 +1961,7 @@ async function saveEdit(){
 
 /* ---------- events ---------- */
 $('#acct').addEventListener('click', ()=>{ if(tab!=='acct') backTab=tab; tab='acct'; authMsg=null; authMode='signin'; render(); window.scrollTo(0,0); });
-document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){ userPickedTab=true; tab=b.dataset.tab; confirming=null; editNames=false; renaming=null; render(); } });
+document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b){ userPickedTab=true; profile=null; tab=b.dataset.tab; confirming=null; editNames=false; renaming=null; render(); } });
 $('#main').addEventListener('submit', async e=>{
   e.preventDefault();
   if(e.target.id==='newpform'){ const v=$('#newp').value.trim().replace(/\s+/g,' '); if(!v) return;
@@ -2006,6 +2068,8 @@ $('#main').addEventListener('click', async e=>{
   else if(d.vote){ const a=activeAnn(), nm0=($('#poll-name')||{}).value||pollName; if(a && nm0) castVote(a, nm0, d.vote); }
   else if(d.owe){ const p=d.owe, on=!isOwing(p); settings.owing = on ? [...new Set([...(settings.owing||[]), p])] : (settings.owing||[]).filter(x=>x!==p); saveSettings(); logChange(`${on?'Marked as owing':'Paid up'}: ${p}`); render(); }
   else if(d.excuse){ toggleExcuse(d.excuse); }
+  else if(d.prof){ profile=d.prof; render(); window.scrollTo(0,0); }
+  else if(t.id==='prof-back'){ profile=null; render(); }
   else if(d.sort){ seedSort = seedSort.key===d.sort ? {key:d.sort, dir:-seedSort.dir} : {key:d.sort, dir:d.sort==='name'?1:-1}; render(); }
   else if(d.annedit!=null){ const a=allAnns().find(x=>x.id===d.annedit); if(a){ const st=new Date(a.start); annDraft={startLocal:toLocalInput(a.start), end:'', venue:a.venue||'recess', courts:a.courts||4, max:a.max||0, when: a.from && new Date(a.from).getTime() < st.getTime()-24*3600*1000-60000 ? 'now':'24h', headline:a.headline||'', players:(a.players||[]).map(p=>resolveName(p)||p), dtd:(a.dtd||[]).map(p=>resolveName(p)||p)}; annEditId=a.id; lmOpen.add('ann'); render(); } }
   else if(t.id==='ann-cancel'){ annDraft=null; annEditId=null; lmMsg.ann=null; render(); }
