@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261124054550">
+<meta name="gp-build" content="20261124061753">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -515,6 +515,13 @@ summary{cursor:pointer;font-weight:600}
 .poll-note{font-size:13px;margin:8px 0 0}
 .update-bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 16px;border:0;border-radius:12px;background:var(--fg);color:var(--bg);font:inherit;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .arrive-box{border:1px dashed var(--line);border-radius:12px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px}
+.arrive-box h3{margin:0;font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase}
+.arrive-box p{margin:0}
+.arrive-box.big{border:3px solid var(--ball);background:color-mix(in srgb,var(--ball) 16%,var(--surface));padding:16px;margin:0 0 18px;gap:10px}
+.arrive-box.big h3{font-size:clamp(24px,5vw,34px)}
+.arrive-box.big .muted{font-size:clamp(14px,2.4vw,18px)}
+.arrive-box.big select,.arrive-box.big #arrive-add{font-size:clamp(16px,2.6vw,20px);padding:12px 14px}
+.arrive-box.big #arrive-add{min-width:140px}
 .arrive-box .muted{font-size:13px}
 .arrive-box select{flex:1;min-width:0}
 .later-court{margin-top:12px}
@@ -997,6 +1004,14 @@ function leaveOptions(p){
     const title = o.type==='sub' ? `${o.name} (sub)` : o.type==='up' ? `${o.name} moves up from ${courtName(ci+1,n0)}` : (n1<n0 ? `${courtName(ci,n0)} sits out` : 'Fill automatically');
     return {...o, title, moves, restarts, breaks:n1<n0};
   });
+}
+// sign-in box for late arrivals: sits at the top of Tonight so it's obvious on the iPad people check in on
+function arriveBox(){
+  const la=lastAnn(), here=new Set([...night.arrivals, ...night.bench, ...night.courts.flatMap(c=>[...c.a,...c.b])]);
+  const due=la?(la.players||[]).map(p=>resolveName(p)||p).filter(p=>!here.has(p)):[];
+  return `<section class="arrive-box${la?' big':''}"><h3>Just arrived? Sign in here</h3>${due.length?`<p class="muted">Pick your name from today’s roster. You join the subs in the order you arrive.</p>
+    <div class="row"><select id="arrive-sel" aria-label="Your name"><option value="">Pick your name (${due.length} still to come)…</option>${due.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button class="btn primary" id="arrive-add">I’m here</button></div>`:la?'<p class="muted">Everyone on today’s roster is here.</p>':''}
+    <form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Not on the roster? Type your name" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form></section>`;
 }
 function addArrival(v){
   if(!roster.includes(v)){ roster.push(v); saveRoster(); logChange(`Added new player ${v} (late arrival)`, 'name'); }
@@ -1674,6 +1689,7 @@ function liveView(ro){
     check=`<div class="confirm"><p>Go back to round ${night.round-1}? Courts, partners and scores return to how they were before you tapped Next round. Anything changed since then is cleared.</p><div class="row"><button class="btn danger" id="undo-yes">Undo last round</button><button class="btn" id="end-no">Keep this round</button></div></div>`;
   }
   return `
+  ${!ro&&lastAnn()?arriveBox():''}
   ${ro?'':roundTabs()}
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Round ${night.round}</h2>${top}</div>
   ${!ro&&(night.leaveUndo||[]).length?(()=>{ const u=night.leaveUndo[night.leaveUndo.length-1];
@@ -1694,11 +1710,7 @@ function liveView(ro){
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
   ${!ro&&nextOk?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round${early?` <small>(${playing} still playing)</small>`:''}</button>${early?`<p class="muted next-note">Courts that finished move on now. ${playing===1?'The game still going stays':'The games still going stay'} on screen to score.</p>`:''}`}</div>`
     :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
-  ${ro?'':(()=>{ const la=lastAnn(), here=new Set([...night.arrivals, ...night.bench, ...night.courts.flatMap(c=>[...c.a,...c.b])]);
-      const due=la?(la.players||[]).map(p=>resolveName(p)||p).filter(p=>!here.has(p)):[];
-      return `<div class="arrive-box"><b>Who’s just arrived?</b>${due.length?`<span class="muted">Pick them from today’s roster as they turn up. They join the subs in the order they arrive.</span>
-        <div class="row"><select id="arrive-sel" aria-label="Player who just arrived"><option value="">Today’s roster (${due.length} still to come)…</option>${due.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button class="btn sm primary" id="arrive-add">Arrived</button></div>`:la?'<span class="muted">Everyone on today’s roster is here.</span>':''}
-        <form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Someone not on the roster" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form></div>`; })()}
+  ${!ro&&!lastAnn()?arriveBox():''}
   <h2>Tonight’s ranking</h2>
   ${tonightGames().length?rankTable(tonight(),{left:night.left}):'<p class="muted">Fills in as scores go in.</p>'}
   ${ro?`<h2>Ref</h2>${refForm()}`:`${sheet?sheetView():''}
