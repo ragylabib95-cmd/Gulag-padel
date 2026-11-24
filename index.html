@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="gp-build" content="20261122082021">
+<meta name="gp-build" content="20261124052429">
 <meta name="description" content="Gulag Padel: tiered-court padel nights in Melbourne. Live courts, seeding and history.">
 <meta name="theme-color" content="#b4532a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -509,6 +509,10 @@ summary{cursor:pointer;font-weight:600}
 .poll-who{margin:4px 2px 0;font-size:13px;color:var(--muted)}
 .poll-note{font-size:13px;margin:8px 0 0}
 .update-bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 16px;border:0;border-radius:12px;background:var(--fg);color:var(--bg);font:inherit;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.arrive-box{border:1px dashed var(--line);border-radius:12px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px}
+.arrive-box .muted{font-size:13px}
+.arrive-box select{flex:1;min-width:0}
+.later-court{margin-top:12px}
 .owing{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:#c0392b;color:#fff;font-family:var(--body);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
 .dtd-t{margin-left:6px;padding:1px 6px;border:1px solid #e07b1a;border-radius:999px;background:none;color:#c4650f;font:inherit;font-size:10px;font-weight:800;letter-spacing:.05em;cursor:pointer}
 .dtd-t.on{background:#e07b1a;color:#fff}
@@ -800,12 +804,13 @@ const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.flo
 const setupNames = () => { const s=night.setup; return Array.from({length:s.courts*4+s.subs}, (_,i)=> (s.names[i]||'').trim()); };
 const freshCourt = (p, lab='Drawn') => ({a:[p[0],p[1]], b:[p[2],p[3]], aLab:lab, bLab:lab, free:true, pairs:null, face:null, score:null, winner:null});
 
-function startNight(partial){
+function startNight(partial, openNow){
   const s=night.setup, all=setupNames(), here=all.filter(Boolean);
-  const k = partial ? Math.min(s.courts, Math.floor(here.length/4)) : s.courts;
+  // openNow: the last court(s) are booked later, so start on fewer courts and everyone else waits as a sub
+  const k = openNow ? Math.min(openNow, Math.floor(here.length/4)) : partial ? Math.min(s.courts, Math.floor(here.length/4)) : s.courts;
   if(!s.venue || k<1) return;
-  if(!partial && all.slice(0,k*4).some(n=>!n)) return;
-  const names = partial ? here : all;
+  if(!partial && !openNow && all.slice(0,k*4).some(n=>!n)) return;
+  const names = (partial||openNow) ? here : all;
   night.planned = s.courts;
   night.venue = s.venue;
   names.filter(Boolean).forEach(p=>{ if(!roster.includes(p)) roster.push(p); }); saveRoster();
@@ -987,6 +992,12 @@ function leaveOptions(p){
     const title = o.type==='sub' ? `${o.name} (sub)` : o.type==='up' ? `${o.name} moves up from ${courtName(ci+1,n0)}` : (n1<n0 ? `${courtName(ci,n0)} sits out` : 'Fill automatically');
     return {...o, title, moves, restarts, breaks:n1<n0};
   });
+}
+function addArrival(v){
+  if(!roster.includes(v)){ roster.push(v); saveRoster(); logChange(`Added new player ${v} (late arrival)`, 'name'); }
+  const inPlay = night.courts.some(c=>[...c.a,...c.b].includes(v)) || night.bench.includes(v);
+  if(!inPlay){ night.bench.push(v); night.left=night.left.filter(x=>x!==v); if(!night.arrivals.includes(v)) night.arrivals.push(v); saveNight(); setStatus(`${v} added to the subs`); }
+  render();
 }
 function addCourtFromSubs(){ const four=night.bench.splice(0,4); night.courts.push(freshCourt(four,'Arrived late')); logChange(`Opened court ${night.courts.length} for ${four.join(', ')}`); saveNight(); render(); window.scrollTo(0,0); }
 function setScore(c, t, v){
@@ -1380,7 +1391,8 @@ function setupView(){
   <div class="arrivals">${rows}</div>
   <div class="row" style="justify-content:space-between"><span class="count ${missing?'bad':'ok'}">${filled} of ${need+s.subs}</span><span class="muted">${!s.venue?'Pick a venue':missing?`${missing} court spot${missing>1?'s':''} still empty`:'Ready to play'}</span></div>
   ${(()=>{ const can=Math.min(k,Math.floor(filled/4)); return missing&&s.venue&&can>=1 ? `<div class="early-start"><p><b>Not everyone’s here yet?</b> Start with the ${filled} who are. ${can===1?'They play on 1 court':`They fill the top ${can} courts`}${filled-can*4?` and ${filled-can*4} wait${filled-can*4===1?'s':''} as a sub`:''}. Add latecomers as late arrivals; once 4 are waiting you can open the next court.</p><button class="btn primary" id="start-partial">Start with ${can} court${can>1?'s':''} now</button></div>` : ''; })()}
-  <div class="actions"><button class="btn primary" id="start" ${missing||!s.venue?'disabled':''}>Start the night</button>${filled?'<button class="btn" id="clear">Reset</button>':''}</div>`;
+  <div class="actions"><button class="btn primary" id="start" ${missing||!s.venue?'disabled':''}>Start the night</button>${filled?'<button class="btn" id="clear">Reset</button>':''}</div>
+  ${k>1&&s.venue&&filled>=(k-1)*4?`<div class="early-start later-court"><p><b>Court ${k} booked later?</b> Start on ${k-1} court${k-1>1?'s':''} now${filled-(k-1)*4?` with ${filled-(k-1)*4} waiting as subs`:''}. When court ${k} is free, tap <b>Open court ${k} now</b> on the Tonight screen and the first 4 subs go on.</p><button class="btn" id="start-later">Start on ${k-1} court${k-1>1?'s':''} now</button></div>`:''}`;
 }
 const crownSvg = () => `<svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15 1 4l6 5 5-8 5 8 6-5-1 11z"/><rect x="2" y="15.5" width="20" height="2.5" rx="1"/></svg>`;
 function courtView(c,i,n,ro){
@@ -1671,13 +1683,17 @@ function liveView(ro){
   ${carryView(ro)}
   ${n?C.map((c,i)=>courtView(c,i,n,ro)).join(''):`<div class="banner warn">Not enough players for a court. Add subs below${night.bench.length>=4?' or open a court from the subs':''}.</div>`}
   ${!ro && !K && night.planned && n<night.planned ? (night.bench.length>=4
-    ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button></div>`
-    : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Add latecomers as late arrivals below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
+    ? `<div class="late-banner ready"><p><b>${night.bench.slice(0,4).map(esc).join(', ')}</b> are here. Open court ${n+1} of ${night.planned} for them: it goes in at the bottom as the new gulag, and the current gulag becomes Tier ${n}.</p><button class="btn primary" id="addcourt">Open court ${n+1} now</button><p class="muted" style="margin:6px 0 0;font-size:13px">Court not free yet? Leave it. Everyone keeps playing as subs until you tap.</p></div>`
+    : `<div class="late-banner"><p>Running <b>${n} of ${night.planned}</b> courts. Mark people as they arrive below. ${4-night.bench.length} more and you can open court ${n+1}.</p></div>`) : ''}
   <div class="bench"><b>${n===1?'Sitting out':'Gulag subs'}</b><span class="muted">${night.bench.length?night.bench.map((p,i)=>i<(sl?1:2)?`<strong>${pb(p,ro)}</strong>`:pb(p,ro)).join(', ')+(sl?`<br>${esc(sl.first)} comes on next, with the point slam winner`:n===1?'<br>One court: teams are reshuffled every game and everyone takes turns sitting out':'<br>The first two come on next'):n===1?'Teams are reshuffled every game.':'No subs waiting. Gulag losers stay on.'}</span>${!ro&&!K&&night.bench.length>=4&&!(night.planned&&n<night.planned)?'<button class="btn sm" id="addcourt">Open a court from the subs</button>':''}</div>
   ${sl?`<div class="slam"><div class="slam-head"><b>Point slam</b><span class="muted">${esc(sl.pair[0])} and ${esc(sl.pair[1])} just lost in the gulag. Best of 3 points: the winner takes the second sub spot next round.</span></div>${sl.pair.map((p,t)=>`<div class="slam-row${sl.winner===t?' won':''}"><span class="slam-name">${pb(p,ro)}${sl.winner===t?' <span class="mv mv-on">On next</span>':''}</span>${ro?`<span class="g-score big">${sl.score[t]??'–'}</span>`:`<div class="sc" role="group" aria-label="Points won by ${esc(p)}">${[0,1,2].map(v=>`<button class="sv sm${sl.score[t]===v?' on':''}" data-slam="${t}:${v}" aria-pressed="${sl.score[t]===v}">${v}</button>`).join('')}</div>`}</div>`).join('')}</div>`:''}
   ${!ro&&nextOk?`<div class="next-block" id="next-block">${confirming==='next'?check:`<button class="btn primary wide" id="next">Next round${early?` <small>(${playing} still playing)</small>`:''}</button>${early?`<p class="muted next-note">Courts that finished move on now. ${playing===1?'The game still going stays':'The games still going stay'} on screen to score.</p>`:''}`}</div>`
     :!ro&&K&&courtsDone?`<p class="muted next-note">Next round opens once round ${K.round}’s last ${K.courts.length===1?'score is':'scores are'} confirmed above.</p>`:''}
-  ${ro?'':`<form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Late arrival" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form>`}
+  ${ro?'':(()=>{ const la=lastAnn(), here=new Set([...night.arrivals, ...night.bench, ...night.courts.flatMap(c=>[...c.a,...c.b])]);
+      const due=la?(la.players||[]).map(p=>resolveName(p)||p).filter(p=>!here.has(p)):[];
+      return `<div class="arrive-box"><b>Who’s just arrived?</b>${due.length?`<span class="muted">Pick them from today’s roster as they turn up. They join the subs in the order they arrive.</span>
+        <div class="row"><select id="arrive-sel" aria-label="Player who just arrived"><option value="">Today’s roster (${due.length} still to come)…</option>${due.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button class="btn sm primary" id="arrive-add">Arrived</button></div>`:la?'<span class="muted">Everyone on today’s roster is here.</span>':''}
+        <form class="row" id="lateform"><input id="latep" autocomplete="off" placeholder="Someone not on the roster" aria-label="Late arrival name"><button class="btn sm" type="submit">Add as a sub</button></form></div>`; })()}
   <h2>Tonight’s ranking</h2>
   ${tonightGames().length?rankTable(tonight(),{left:night.left}):'<p class="muted">Fills in as scores go in.</p>'}
   ${ro?`<h2>Ref</h2>${refForm()}`:`${sheet?sheetView():''}
@@ -1917,11 +1933,7 @@ $('#main').addEventListener('submit', async e=>{
     confirming=null; await renamePlayer(renaming, v); return; }
   if(e.target.id==='pwform'){ const v=$('#pw').value; let ok=false; try{ ok=(await sha256(v))===activeHash(); }catch(err){}
     if(ok){ unlocked=true; if(lockPrompt==='round'){ lockPrompt=null; startRoundEdit(); } else startEdit(lockPrompt); } else { pwErr='That password isn’t right.'; render(); const i=$('#pw'); if(i) i.focus(); } return; }
-  if(e.target.id==='lateform'){ const v=$('#latep').value.trim(); if(!v) return;
-    if(!roster.includes(v)){ roster.push(v); saveRoster(); logChange(`Added new player ${v} (late arrival)`, 'name'); }
-    const inPlay = night.courts.some(c=>[...c.a,...c.b].includes(v)) || night.bench.includes(v);
-    if(!inPlay){ night.bench.push(v); night.left=night.left.filter(x=>x!==v); if(!night.arrivals.includes(v)) night.arrivals.push(v); saveNight(); }
-    render(); }
+  if(e.target.id==='lateform'){ const v=$('#latep').value.trim(); if(!v) return; addArrival(v); return; }
 });
 $('#main').addEventListener('change', e=>{
   if(e.target.id==='poll-name'){ pollName=e.target.value||null; try{ if(pollName) localStorage.setItem('gp-poll-name',pollName); }catch(_){} pollMsg=''; render(); return; }
@@ -2070,6 +2082,8 @@ $('#main').addEventListener('click', async e=>{
     const fallback=()=>{ copyFallback=key; render(); const b=$('#copybox'); if(b){ b.focus(); b.select(); } };
     try{ navigator.clipboard.writeText(txt).then(()=>{ copied=key; copyFallback=null; render(); }, fallback); }catch(err){ fallback(); } }
   else if(t.id==='addcourt') addCourtFromSubs();
+  else if(t.id==='arrive-add'){ const v=($('#arrive-sel')||{}).value; if(v) addArrival(v); }
+  else if(t.id==='start-later'){ startNight(false, night.setup.courts-1); }
   else if(d.opt){ const [ci,k]=d.opt.split(':').map(Number), c=night.courts[ci]; c.pairs=allOptions(c)[k]; c.face='picked'; saveNight(); render(); }
   else if(d.redraw!=null){ const c=night.courts[+d.redraw]; c.pairs=null; c.face=null; c.score=null; c.winner=null; saveNight(); render(); }
   else if(d.cscore){ const [k,tmi,v]=d.cscore.split(':').map(Number), g=night.carry&&night.carry.courts.find(x=>x.court===k); if(g){ setScore(g,tmi,v); saveNight(); render(); } }
